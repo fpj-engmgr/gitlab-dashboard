@@ -222,96 +222,104 @@ class GitLabClient:
         return list(all_commits.values())
 
     def get_commits(self, days: int = 30) -> List[Dict[str, Any]]:
-        """Fetch commits for all team members in a single optimized pass."""
+        """Derive commits from MRs - much faster than scanning user events."""
+
+        # Check if user wants detailed commit fetching (slower)
+        if not settings.fetch_commit_details:
+            logger.info("Skipping detailed commit fetching (fetch_commit_details=False) - using MR-derived counts instead")
+            return []  # Return empty list - contributor stats will derive counts from MRs
+
         all_commits = {}  # Use dict to deduplicate by commit ID
 
         since = datetime.utcnow() - timedelta(days=days)
         team_members_set = set(self.team_members)
 
-        logger.info(f"Fetching commits for {len(self.team_members)} team members (optimized with caching)")
+        logger.info(f"Deriving commits from MRs (fetch_commit_details=True)")
 
-        # Cache projects and users to avoid repeated fetches
-        project_cache = {}
-        user_cache = {}
+        try:
+            group = self.get_group()
 
-        for username in self.team_members:
-            try:
-                # Get user from cache or fetch once
-                if username not in user_cache:
-                    users = self.gl.users.list(username=username)
-                    if not users:
-                        logger.debug(f"User {username} not found")
-                        continue
-                    user_cache[username] = users[0]
+            # Get all MRs (we already do this efficiently for MR metrics)
+            group_mrs = group.mergerequests.list(
+                updated_after=since.isoformat(),
+                get_all=True
+            )
 
-                user = user_cache[username]
+            logger.info(f"Extracting commits from {len(group_mrs)} MRs")
 
-                # Fetch user events filtered by date range using 'after' parameter
-                events = self.gl.users.get(user.id).events.list(
-                    after=since.date().isoformat(),
-                    get_all=True
-                )
+            # Cache projects to avoid repeated fetches
+            project_cache = {}
 
-                # Filter to push events within our group
-                for event in events:
-                    if event.action_name != 'pushed to':
-                        continue
+            for mr in group_mrs:
+                # Only process MRs from team members
+                author = mr.author.get('username', 'unknown')
+                if author not in team_members_set:
+                    continue
 
-                    try:
-                        push_data = event.push_data
-                        if not push_data:
+                try:
+                    # Get project from cache or fetch once
+                    project_id = mr.project_id
+                    if project_id not in project_cache:
+                        project_cache[project_id] = self.gl.projects.get(project_id)
+
+                    project = project_cache[project_id]
+                    full_mr = project.mergerequests.get(mr.iid)
+
+                    # Get commits from this MR
+                    mr_commits = full_mr.commits()
+
+                    for commit in mr_commits:
+                        commit_id = commit['id']
+
+                        # Skip if already processed
+                        if commit_id in all_commits:
                             continue
 
-                        project_id = event.project_id
-                        commit_to = push_data.get('commit_to')
+                        # Parse commit date
+                        commit_date = datetime.fromisoformat(commit['committed_date'].replace('Z', '+00:00'))
 
-                        if not commit_to or commit_to in all_commits:
-                            continue
-
-                        # Get project from cache or fetch once
-                        if project_id not in project_cache:
-                            project_cache[project_id] = self.gl.projects.get(project_id)
-
-                        project = project_cache[project_id]
-
-                        # Filter to projects within our group
-                        if not project.path_with_namespace.startswith(self.group_path):
-                            continue
-
-                        # Fetch the actual commit
-                        commit = project.commits.get(commit_to)
-                        commit_date = datetime.fromisoformat(commit.committed_date.replace('Z', '+00:00'))
-
+                        # Filter by date range
                         if commit_date < since:
                             continue
 
+                        # Filter to commits by team members (by email)
+                        commit_author_email = commit.get('author_email', '').lower()
+                        is_team_member = False
+                        for username in team_members_set:
+                            if username.lower() in commit_author_email or commit_author_email.startswith(f"{username.lower()}@"):
+                                is_team_member = True
+                                break
+
+                        if not is_team_member:
+                            continue
+
                         commit_data = {
-                            'id': commit.id,
+                            'id': commit_id,
                             'project_id': project_id,
                             'project_name': project.name,
-                            'author_name': commit.author_name,
-                            'author_email': commit.author_email,
+                            'author_name': commit.get('author_name', 'Unknown'),
+                            'author_email': commit_author_email,
                             'committed_date': commit_date,
-                            'title': commit.title,
-                            'message': commit.message,
-                            'web_url': commit.web_url,
+                            'title': commit['title'],
+                            'message': commit.get('message', ''),
+                            'web_url': commit.get('web_url', ''),
                         }
-                        all_commits[commit.id] = commit_data
+                        all_commits[commit_id] = commit_data
 
-                    except gitlab.exceptions.GitlabGetError as e:
-                        if e.response_code == 403:
-                            continue
-                        logger.debug(f"Error fetching commit details: {e}")
+                except gitlab.exceptions.GitlabGetError as e:
+                    if e.response_code == 403:
                         continue
-                    except Exception as e:
-                        logger.debug(f"Error processing push event: {e}")
-                        continue
+                    logger.debug(f"Error processing MR {mr.iid}: {e}")
+                    continue
+                except Exception as e:
+                    logger.debug(f"Error extracting commits from MR {mr.iid}: {e}")
+                    continue
 
-            except Exception as e:
-                logger.debug(f"Error fetching commits for {username}: {e}")
-                continue
+            logger.info(f"Found {len(all_commits)} unique commits from team members (scanned {len(project_cache)} projects)")
 
-        logger.info(f"Found {len(all_commits)} unique commits across all team members (cached {len(project_cache)} projects, {len(user_cache)} users)")
+        except Exception as e:
+            logger.error(f"Error deriving commits from MRs: {e}")
+
         return list(all_commits.values())
 
     def get_comments_for_member(self, username: str, days: int = 30) -> List[Dict[str, Any]]:
@@ -379,6 +387,12 @@ class GitLabClient:
 
     def get_comments(self, days: int = 30) -> List[Dict[str, Any]]:
         """Fetch comments for all team members in a single pass through MRs."""
+
+        # Check if user wants comment fetching (slower)
+        if not settings.fetch_comment_details:
+            logger.info("Skipping comment fetching (fetch_comment_details=False)")
+            return []  # Return empty list - faster!
+
         all_comments = []
 
         since = datetime.utcnow() - timedelta(days=days)
@@ -388,7 +402,7 @@ class GitLabClient:
             group = self.get_group()
 
             # Single API call to get all MRs
-            logger.info(f"Fetching all MRs to scan for team member comments (single pass)")
+            logger.info(f"Fetching all MRs to scan for team member comments (fetch_comment_details=True)")
             group_mrs = group.mergerequests.list(
                 updated_after=since.isoformat(),
                 get_all=True

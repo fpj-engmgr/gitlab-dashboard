@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     cache_duration_hours: int = 6
     team_members_file: str = "team_members.json"
     max_parallel_requests: int = 10  # Limit concurrent API requests
+    fetch_commit_details: bool = False  # Set True to fetch individual commit details (slower)
+    fetch_comment_details: bool = False  # Set True to fetch MR comments (slower)
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
