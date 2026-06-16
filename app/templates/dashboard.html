@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitLab Dashboard - Red Hat RHEL AI</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>GitLab Metrics Dashboard</h1>
+            <p>Red Hat RHEL AI Team - Engineering Analytics</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="controls">
+            <label for="dateRange">Time Range:</label>
+            <select id="dateRange">
+                <option value="7">Last 7 Days</option>
+                <option value="14">Last 14 Days</option>
+                <option value="30" selected>Last 30 Days</option>
+                <option value="60">Last 60 Days</option>
+                <option value="90">Last 90 Days</option>
+            </select>
+            <button id="refreshBtn">Refresh Data</button>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <h3>Total MRs</h3>
+                <div class="value" id="total-mrs">-</div>
+                <div class="label">Merge Requests</div>
+            </div>
+            <div class="metric-card">
+                <h3>Merged</h3>
+                <div class="value" id="merged-mrs">-</div>
+                <div class="label">Successfully Merged</div>
+            </div>
+            <div class="metric-card">
+                <h3>Open MRs</h3>
+                <div class="value" id="open-mrs">-</div>
+                <div class="label">Currently Open</div>
+            </div>
+            <div class="metric-card">
+                <h3>Avg Merge Time</h3>
+                <div class="value" id="avg-merge-time">-</div>
+                <div class="label">Hours</div>
+            </div>
+            <div class="metric-card">
+                <h3>Total Commits</h3>
+                <div class="value" id="total-commits">-</div>
+                <div class="label">Across All Projects</div>
+            </div>
+            <div class="metric-card">
+                <h3>Contributors</h3>
+                <div class="value" id="total-contributors">-</div>
+                <div class="label">Active Contributors</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h2>Merge Request Status</h2>
+                <div class="chart-container">
+                    <canvas id="mrStateChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h2>Commits Over Time</h2>
+                <div class="chart-container">
+                    <canvas id="commitsByDayChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h2>Top Contributors</h2>
+                <div class="chart-container">
+                    <canvas id="topContributorsChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h2>Commits by Project</h2>
+                <div class="chart-container">
+                    <canvas id="commitsByProjectChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-card">
+            <h2>Recent Merge Requests</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Project</th>
+                        <th>Author</th>
+                        <th>Status</th>
+                        <th>Time to Merge</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody id="mrTableBody">
+                    <tr><td colspan="6" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-card">
+            <h2>Top Contributors</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Username</th>
+                        <th>Commits</th>
+                        <th>Merge Requests</th>
+                        <th>Last Activity</th>
+                    </tr>
+                </thead>
+                <tbody id="contributorTableBody">
+                    <tr><td colspan="5" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
