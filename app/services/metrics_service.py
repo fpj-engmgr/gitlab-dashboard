@@ -145,80 +145,58 @@ class MetricsService:
         }
 
     def get_commit_metrics(self, days: int = 30):
-        """Get commit metrics from cache or refresh if needed."""
-        if self.should_refresh_cache("commits"):
-            self.refresh_commits(days=days)
+        """Get commit metrics - derived from contributor stats (hybrid approach)."""
+        # In hybrid mode, we don't populate the commits table (too slow)
+        # Instead, derive totals from contributor commit_counts
 
-        commits = self.db.query(Commit).all()
+        if self.should_refresh_cache("contributors"):
+            self.refresh_contributors(days=days)
 
-        total_commits = len(commits)
+        contributors = self.db.query(Contributor).all()
 
+        # Aggregate from contributor stats
+        total_commits = sum(c.commit_count for c in contributors)
+
+        # Note: We don't have by_project or by_day breakdown without fetching individual commits
+        # This is a trade-off for speed
         commits_by_project = {}
-        for commit in commits:
-            if commit.project_name not in commits_by_project:
-                commits_by_project[commit.project_name] = 0
-            commits_by_project[commit.project_name] += 1
-
         commits_by_day = {}
-        for commit in commits:
-            day = commit.committed_date.date().isoformat()
-            if day not in commits_by_day:
-                commits_by_day[day] = 0
-            commits_by_day[day] += 1
 
         return {
             "total": total_commits,
             "by_project": commits_by_project,
             "by_day": commits_by_day,
-            "recent_commits": [
-                {
-                    "id": commit.id,
-                    "project_name": commit.project_name,
-                    "author_name": commit.author_name,
-                    "title": commit.title,
-                    "committed_date": commit.committed_date.isoformat(),
-                    "web_url": commit.web_url,
-                }
-                for commit in sorted(commits, key=lambda c: c.committed_date, reverse=True)[:20]
-            ]
+            "recent_commits": []  # Not available in hybrid mode (would be too slow)
         }
 
     def get_comment_metrics(self, days: int = 30):
-        """Get comment/review metrics from cache or refresh if needed."""
-        if self.should_refresh_cache("comments"):
-            self.refresh_comments(days=days)
+        """Get comment/review metrics - derived from contributor stats (hybrid approach)."""
+        # In hybrid mode, we don't populate the comments table (too slow)
+        # Instead, derive totals from contributor comment_counts
 
-        comments = self.db.query(Comment).all()
+        if self.should_refresh_cache("contributors"):
+            self.refresh_contributors(days=days)
 
-        total_comments = len(comments)
+        contributors = self.db.query(Contributor).all()
 
-        comments_by_author = {}
-        for comment in comments:
-            if comment.author not in comments_by_author:
-                comments_by_author[comment.author] = 0
-            comments_by_author[comment.author] += 1
+        # Aggregate from contributor stats
+        total_comments = sum(c.comment_count for c in contributors)
 
+        comments_by_author = {
+            c.username: c.comment_count
+            for c in contributors
+            if c.comment_count > 0
+        }
+
+        # Note: We don't have by_day breakdown without fetching individual comments
+        # This is a trade-off for speed
         comments_by_day = {}
-        for comment in comments:
-            day = comment.created_at.date().isoformat()
-            if day not in comments_by_day:
-                comments_by_day[day] = 0
-            comments_by_day[day] += 1
 
         return {
             "total": total_comments,
             "by_author": comments_by_author,
             "by_day": comments_by_day,
-            "recent_comments": [
-                {
-                    "author": comment.author,
-                    "mr_title": comment.mr_title,
-                    "body": comment.body[:200],  # Truncate long comments
-                    "created_at": comment.created_at.isoformat(),
-                    "web_url": comment.web_url,
-                }
-                for comment in sorted(comments, key=lambda c: c.created_at, reverse=True)[:20]
-            ]
+            "recent_comments": []  # Not available in hybrid mode (would be too slow)
         }
 
     def get_contributor_metrics(self, days: int = 30):
