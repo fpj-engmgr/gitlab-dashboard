@@ -83,12 +83,10 @@ class MetricsService:
         self.update_cache_metadata("comments")
 
     def refresh_contributors(self, days: int = 30):
-        """Refresh contributors cache."""
-        commits_data = self.gitlab_client.get_commits(days=days)
-        mrs_data = self.gitlab_client.get_merge_requests(days=days)
-        comments_data = self.gitlab_client.get_comments(days=days)
+        """Refresh contributors cache using activity-based counting (fast!)."""
 
-        contributors_data = self.gitlab_client.get_contributor_stats(commits_data, mrs_data, comments_data)
+        # Use the new fast activity-based approach
+        contributors_data = self.gitlab_client.get_contributor_stats_from_activity(days=days)
 
         self.db.query(Contributor).delete()
 

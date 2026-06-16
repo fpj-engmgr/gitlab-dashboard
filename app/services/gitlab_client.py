@@ -466,6 +466,72 @@ class GitLabClient:
 
         return all_comments
 
+    def get_contributor_stats_from_activity(self, days: int = 30) -> List[Dict[str, Any]]:
+        """Get contributor stats by counting activities from user events - much faster!"""
+        contributors = {}
+        since = datetime.utcnow() - timedelta(days=days)
+
+        logger.info(f"Fetching activity counts for {len(self.team_members)} team members")
+
+        for username in self.team_members:
+            try:
+                # Get user
+                users = self.gl.users.list(username=username)
+                if not users:
+                    logger.debug(f"User {username} not found")
+                    continue
+
+                user = users[0]
+
+                # Get user events filtered by date
+                events = self.gl.users.get(user.id).events.list(
+                    after=since.date().isoformat(),
+                    get_all=True
+                )
+
+                # Count activity types
+                mr_count = 0
+                commit_count = 0
+                comment_count = 0
+                last_activity = since
+
+                for event in events:
+                    event_date = datetime.fromisoformat(event.created_at.replace('Z', '+00:00'))
+
+                    if event_date > last_activity:
+                        last_activity = event_date
+
+                    # Count different activity types
+                    action = event.action_name
+
+                    if action == 'pushed to' or action == 'pushed new':
+                        commit_count += 1
+                    elif action in ['opened', 'accepted', 'closed'] and event.target_type == 'MergeRequest':
+                        # Only count 'opened' to avoid double-counting same MR
+                        if action == 'opened':
+                            mr_count += 1
+                    elif action == 'commented on':
+                        comment_count += 1
+
+                contributors[username] = {
+                    'username': username,
+                    'name': user.name if hasattr(user, 'name') else username,
+                    'email': user.email if hasattr(user, 'email') else f"{username}@unknown",
+                    'commit_count': commit_count,
+                    'mr_count': mr_count,
+                    'comment_count': comment_count,
+                    'last_activity': last_activity
+                }
+
+                logger.debug(f"{username}: {mr_count} MRs, {commit_count} commits, {comment_count} comments")
+
+            except Exception as e:
+                logger.debug(f"Error fetching activity for {username}: {e}")
+                continue
+
+        logger.info(f"Retrieved activity stats for {len(contributors)} team members")
+        return list(contributors.values())
+
     def get_contributor_stats(self, commits: List[Dict[str, Any]], mrs: List[Dict[str, Any]], comments: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Calculate contributor statistics from commits, MRs, and comments."""
         contributors = {}
