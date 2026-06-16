@@ -116,8 +116,10 @@ Edit `.env` to customize:
 - `GITLAB_TOKEN`: Your personal access token
 - `GITLAB_GROUP`: The group/subgroup path to monitor
 - `DATABASE_URL`: SQLite database location
-- `CACHE_DURATION_HOURS`: How long to cache data before refreshing (default: 1 hour)
+- `CACHE_DURATION_HOURS`: How long to cache data before refreshing (default: 6 hours)
 - `TEAM_MEMBERS_FILE`: Path to JSON file with team member usernames (default: team_members.json)
+
+**Performance Tip**: Increase `CACHE_DURATION_HOURS` to 12 or 24 for even better performance if you don't need real-time data.
 
 ### Team Member Configuration (Required)
 
@@ -142,6 +144,25 @@ The dashboard uses a **team-member-first approach**. You must create a `team_mem
 - Much faster than scanning all projects (especially for groups with 100+ projects)
 - Only tracks your team's work, excluding external contributors and bots
 - Scales efficiently to large GitLab groups
+
+## Performance Optimizations
+
+The dashboard is highly optimized for large GitLab groups:
+
+**Single-Pass Data Fetching**:
+- MRs: 1 API call to fetch all group MRs, then filter client-side
+- Comments: 1 pass through all MRs, scanning notes once
+- Commits: User events API with server-side date filtering (`after` parameter)
+
+**Intelligent Caching**:
+- Project cache: Projects fetched once and reused across API calls
+- User cache: User objects cached to avoid repeated lookups
+- Database cache: All data cached in SQLite for `CACHE_DURATION_HOURS`
+
+**Result**: 
+- First load: ~30-60 seconds (depends on group size and team size)
+- Subsequent loads (within cache window): <1 second (served from database)
+- For 841 projects + 25 team members: went from 25+ API calls per metric to 1-2 calls total
 
 ## Project Structure
 

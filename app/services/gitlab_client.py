@@ -228,21 +228,23 @@ class GitLabClient:
         since = datetime.utcnow() - timedelta(days=days)
         team_members_set = set(self.team_members)
 
-        logger.info(f"Fetching commits for {len(self.team_members)} team members (optimized single pass)")
+        logger.info(f"Fetching commits for {len(self.team_members)} team members (optimized with caching)")
 
-        # Strategy: Fetch events for each user, but batch the processing
-        # Unfortunately GitLab doesn't have a multi-user events endpoint,
-        # but we can optimize by processing events more efficiently
+        # Cache projects and users to avoid repeated fetches
+        project_cache = {}
+        user_cache = {}
 
         for username in self.team_members:
             try:
-                # Get the user object
-                users = self.gl.users.list(username=username)
-                if not users:
-                    logger.debug(f"User {username} not found")
-                    continue
+                # Get user from cache or fetch once
+                if username not in user_cache:
+                    users = self.gl.users.list(username=username)
+                    if not users:
+                        logger.debug(f"User {username} not found")
+                        continue
+                    user_cache[username] = users[0]
 
-                user = users[0]
+                user = user_cache[username]
 
                 # Fetch user events filtered by date range using 'after' parameter
                 events = self.gl.users.get(user.id).events.list(
@@ -266,8 +268,11 @@ class GitLabClient:
                         if not commit_to or commit_to in all_commits:
                             continue
 
-                        # Fetch the project to check if it's in our group
-                        project = self.gl.projects.get(project_id)
+                        # Get project from cache or fetch once
+                        if project_id not in project_cache:
+                            project_cache[project_id] = self.gl.projects.get(project_id)
+
+                        project = project_cache[project_id]
 
                         # Filter to projects within our group
                         if not project.path_with_namespace.startswith(self.group_path):
@@ -306,7 +311,7 @@ class GitLabClient:
                 logger.debug(f"Error fetching commits for {username}: {e}")
                 continue
 
-        logger.info(f"Found {len(all_commits)} unique commits across all team members")
+        logger.info(f"Found {len(all_commits)} unique commits across all team members (cached {len(project_cache)} projects, {len(user_cache)} users)")
         return list(all_commits.values())
 
     def get_comments_for_member(self, username: str, days: int = 30) -> List[Dict[str, Any]]:
@@ -391,10 +396,17 @@ class GitLabClient:
 
             logger.info(f"Scanning {len(group_mrs)} MRs for comments from {len(self.team_members)} team members")
 
+            # Cache projects to avoid repeated fetches
+            project_cache = {}
+
             for mr in group_mrs:
                 try:
-                    # Get the full project to access MR notes
-                    project = self.gl.projects.get(mr.project_id)
+                    # Get project from cache or fetch once
+                    project_id = mr.project_id
+                    if project_id not in project_cache:
+                        project_cache[project_id] = self.gl.projects.get(project_id)
+
+                    project = project_cache[project_id]
                     full_mr = project.mergerequests.get(mr.iid)
 
                     # Get all notes/comments on this MR
@@ -413,7 +425,7 @@ class GitLabClient:
                         comment_data = {
                             'note_id': note.id,
                             'mr_id': mr.id,
-                            'project_id': mr.project_id,
+                            'project_id': project_id,
                             'project_name': getattr(mr, 'references', {}).get('full', 'unknown').split('!')[0],
                             'author': author,
                             'body': note.body,
@@ -433,7 +445,7 @@ class GitLabClient:
                     logger.debug(f"Error processing MR {mr.iid}: {e}")
                     continue
 
-            logger.info(f"Found {len(all_comments)} total comments from team members")
+            logger.info(f"Found {len(all_comments)} total comments from team members (scanned {len(project_cache)} projects)")
 
         except Exception as e:
             logger.error(f"Unexpected error fetching comments: {e}")

@@ -9,8 +9,9 @@ class Settings(BaseSettings):
     gitlab_token: str
     gitlab_group: str = "redhat/rhel-ai"
     database_url: str = "sqlite:///./gitlab_metrics.db"
-    cache_duration_hours: int = 1
+    cache_duration_hours: int = 6
     team_members_file: str = "team_members.json"
+    max_parallel_requests: int = 10  # Limit concurrent API requests
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
