@@ -82,20 +82,27 @@ class MetricsService:
         self.db.commit()
         self.update_cache_metadata("comments")
 
-    def refresh_contributors(self, days: int = 30):
-        """Refresh contributors cache using activity-based counting (fast!)."""
+    def refresh_contributors(self, days: int = 30, fetch_details: bool = False):
+        """Refresh contributors cache - Phase 1 (fast) or Phase 2 (detailed)."""
 
-        # Use the new fast activity-based approach
-        contributors_data = self.gitlab_client.get_contributor_stats_from_activity(days=days)
+        # Fetch MRs (fast - single API call, group-scoped)
+        mrs_data = self.gitlab_client.get_merge_requests(days=days)
+
+        # Get contributor stats (fast if fetch_details=False, slow if True)
+        contributor_stats = self.gitlab_client.get_contributor_stats_from_mrs(mrs_data, days=days, fetch_details=fetch_details)
 
         self.db.query(Contributor).delete()
 
-        for contrib_data in contributors_data:
+        for contrib_data in contributor_stats:
             contributor = Contributor(**contrib_data)
             self.db.add(contributor)
 
         self.db.commit()
         self.update_cache_metadata("contributors")
+
+    def refresh_contributors_detailed(self, days: int = 30):
+        """Phase 2: Refresh with detailed commit/comment counts (slow background operation)."""
+        self.refresh_contributors(days=days, fetch_details=True)
 
     def get_merge_request_metrics(self, days: int = 30):
         """Get merge request metrics from cache or refresh if needed."""

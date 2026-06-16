@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.models import get_db
 from app.services.metrics_service import MetricsService
+import logging
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+logger = logging.getLogger(__name__)
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -44,11 +46,42 @@ async def get_comment_metrics(days: int = 30, db: Session = Depends(get_db)):
 
 
 @router.post("/api/refresh")
-async def refresh_all_metrics(days: int = 30, db: Session = Depends(get_db)):
-    """Force refresh all metrics from GitLab."""
+async def refresh_all_metrics(days: int = 30, background_tasks: BackgroundTasks = None, db: Session = Depends(get_db)):
+    """Force refresh all metrics from GitLab (Phase 1 - fast, MRs only)."""
     service = MetricsService(db)
+
+    # Phase 1: Fast refresh (MRs only, no detailed commit/comment counts)
+    logger.info(f"Phase 1 refresh: MRs only (fast)")
     service.refresh_merge_requests(days=days)
     service.refresh_commits(days=days)
     service.refresh_comments(days=days)
-    service.refresh_contributors(days=days)
-    return {"status": "success", "message": "All metrics refreshed"}
+    service.refresh_contributors(days=days, fetch_details=False)  # Fast: MR counts only
+
+    # Phase 2 will be triggered separately by the client
+    return {"status": "success", "message": "Fast refresh complete (MRs only). Use /api/refresh-detailed for commit/comment counts."}
+
+
+def background_refresh_detailed(days: int):
+    """Background task to fetch detailed commit/comment counts."""
+    from app.models import get_db
+    logger.info(f"Phase 2 background refresh started: fetching detailed commit/comment counts for {days} days")
+
+    db = next(get_db())
+    try:
+        service = MetricsService(db)
+        service.refresh_contributors_detailed(days=days)
+        logger.info("Phase 2 complete: detailed commit/comment counts refreshed")
+    except Exception as e:
+        logger.error(f"Phase 2 failed: {e}")
+    finally:
+        db.close()
+
+
+@router.post("/api/refresh-detailed")
+async def refresh_detailed_metrics(days: int = 30, background_tasks: BackgroundTasks = None):
+    """Phase 2: Fetch detailed commit/comment counts in background (slow, 3-5 minutes)."""
+    if background_tasks:
+        background_tasks.add_task(background_refresh_detailed, days)
+        return {"status": "success", "message": f"Phase 2 started in background. This will take 3-5 minutes for {days} days."}
+    else:
+        return {"status": "error", "message": "Background tasks not available"}

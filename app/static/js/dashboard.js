@@ -254,14 +254,45 @@ function updateContributorTable(contributors) {
 async function refreshData() {
     const button = document.getElementById('refreshBtn');
     button.disabled = true;
-    button.textContent = 'Refreshing...';
+    button.textContent = 'Phase 1: Fetching MRs...';
 
     try {
+        // Phase 1: Fast refresh (MRs only)
         await fetch(`/api/refresh?days=${currentDays}`, { method: 'POST' });
         await fetchMetrics();
+
+        button.textContent = 'Phase 2: Background fetch...';
+
+        // Phase 2: Trigger background fetch of detailed counts
+        fetch(`/api/refresh-detailed?days=${currentDays}`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Phase 2 started:', data.message);
+
+                // Poll for updates every 30 seconds
+                const pollInterval = setInterval(async () => {
+                    const result = await fetch(`/api/metrics/contributors?days=${currentDays}`).then(r => r.json());
+
+                    // Check if we have commit/comment counts (phase 2 complete)
+                    if (result.total_commits > 0 || result.total_comments > 0) {
+                        console.log('Phase 2 complete - refreshing display');
+                        clearInterval(pollInterval);
+                        await fetchMetrics();
+                        button.textContent = 'Refresh Data';
+                        button.disabled = false;
+                    }
+                }, 30000);  // Poll every 30 seconds
+
+                // Also update button after 5 minutes regardless
+                setTimeout(() => {
+                    clearInterval(pollInterval);
+                    button.textContent = 'Refresh Data';
+                    button.disabled = false;
+                }, 300000);  // 5 minutes
+            });
+
     } catch (error) {
         showError('Failed to refresh data');
-    } finally {
         button.disabled = false;
         button.textContent = 'Refresh Data';
     }

@@ -466,6 +466,129 @@ class GitLabClient:
 
         return all_comments
 
+    def get_contributor_stats_from_mrs(self, mrs_data: List[Dict[str, Any]], days: int = 30, fetch_details: bool = True) -> List[Dict[str, Any]]:
+        """Get contributor stats from MR data - Phase 1 (fast) or Phase 2 (detailed)."""
+        contributors = {}
+
+        if not fetch_details:
+            # PHASE 1: Fast - MR counts only (no API calls)
+            logger.info(f"Deriving contributor stats from {len(mrs_data)} MRs (MR counts only - FAST)")
+
+            for mr in mrs_data:
+                author = mr['author']
+
+                if author not in contributors:
+                    contributors[author] = {
+                        'username': author,
+                        'name': author,
+                        'email': f"{author}@unknown",
+                        'commit_count': 0,  # Will be filled in phase 2
+                        'mr_count': 0,
+                        'comment_count': 0,  # Will be filled in phase 2
+                        'last_activity': mr['updated_at']
+                    }
+
+                contributors[author]['mr_count'] += 1
+
+                # Update last activity
+                if mr['updated_at'] > contributors[author]['last_activity']:
+                    contributors[author]['last_activity'] = mr['updated_at']
+
+            logger.info(f"Phase 1 complete: {len(contributors)} contributors, {len(mrs_data)} MRs")
+            return list(contributors.values())
+
+        # PHASE 2: Detailed - fetch commits and comments (SLOW)
+        logger.info(f"Phase 2: Fetching commits + comments for {len(mrs_data)} MRs (this will take a few minutes)")
+
+        # Start with existing contributor data (from phase 1)
+        project_cache = {}
+        processed_count = 0
+
+        for mr in mrs_data:
+            author = mr['author']
+
+            if author not in contributors:
+                contributors[author] = {
+                    'username': author,
+                    'name': author,
+                    'email': f"{author}@unknown",
+                    'commit_count': 0,
+                    'mr_count': 0,
+                    'comment_count': 0,
+                    'last_activity': mr['updated_at']
+                }
+
+            contributors[author]['mr_count'] += 1
+
+            if mr['updated_at'] > contributors[author]['last_activity']:
+                contributors[author]['last_activity'] = mr['updated_at']
+
+            # Fetch detailed data
+            try:
+                project_id = mr['project_id']
+
+                if project_id not in project_cache:
+                    project_cache[project_id] = self.gl.projects.get(project_id)
+
+                project = project_cache[project_id]
+                full_mr = project.mergerequests.get(mr['iid'])
+
+                # Count commits
+                try:
+                    mr_commits = full_mr.commits.list(get_all=True)
+                    contributors[author]['commit_count'] += len(mr_commits)
+                except Exception as e:
+                    logger.debug(f"Could not fetch commits for MR {mr['iid']}: {e}")
+
+                # Count comments and approvals
+                try:
+                    mr_notes = full_mr.notes.list(get_all=True)
+
+                    for note in mr_notes:
+                        note_author = note.author.get('username', 'unknown')
+                        if note_author in self.team_members:
+                            if note_author not in contributors:
+                                contributors[note_author] = {
+                                    'username': note_author,
+                                    'name': note_author,
+                                    'email': f"{note_author}@unknown",
+                                    'commit_count': 0,
+                                    'mr_count': 0,
+                                    'comment_count': 0,
+                                    'last_activity': mr['updated_at']
+                                }
+                            contributors[note_author]['comment_count'] += 1
+
+                    mr_approvals = full_mr.approvals.get()
+                    for approval in mr_approvals.approved_by:
+                        approval_author = approval.get('user', {}).get('username', 'unknown')
+                        if approval_author in self.team_members:
+                            if approval_author not in contributors:
+                                contributors[approval_author] = {
+                                    'username': approval_author,
+                                    'name': approval_author,
+                                    'email': f"{approval_author}@unknown",
+                                    'commit_count': 0,
+                                    'mr_count': 0,
+                                    'comment_count': 0,
+                                    'last_activity': mr['updated_at']
+                                }
+                            contributors[approval_author]['comment_count'] += 1
+
+                except Exception as e:
+                    logger.debug(f"Could not fetch comments/approvals for MR {mr['iid']}: {e}")
+
+                processed_count += 1
+                if processed_count % 50 == 0:
+                    logger.info(f"Processed {processed_count}/{len(mrs_data)} MRs...")
+
+            except Exception as e:
+                logger.debug(f"Error processing MR {mr.get('iid', 'unknown')}: {e}")
+                continue
+
+        logger.info(f"Phase 2 complete: Processed {processed_count} MRs")
+        return list(contributors.values())
+
     def get_contributor_stats_from_activity(self, days: int = 30) -> List[Dict[str, Any]]:
         """Get contributor stats by counting activities from user events - much faster!"""
         contributors = {}
