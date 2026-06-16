@@ -503,14 +503,19 @@ class GitLabClient:
 
                     # Count different activity types
                     action = event.action_name
+                    target = getattr(event, 'target_type', None)
 
                     if action == 'pushed to' or action == 'pushed new':
                         commit_count += 1
-                    elif action in ['opened', 'accepted', 'closed'] and event.target_type == 'MergeRequest':
+                    elif action in ['opened', 'accepted', 'closed'] and target == 'MergeRequest':
                         # Only count 'opened' to avoid double-counting same MR
                         if action == 'opened':
                             mr_count += 1
                     elif action == 'commented on':
+                        # Count all comment types (Note, DiffNote, DiscussionNote)
+                        comment_count += 1
+                    elif action == 'approved' and target == 'MergeRequest':
+                        # MR approvals are also code review activity!
                         comment_count += 1
 
                 contributors[username] = {
