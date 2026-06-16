@@ -1,4 +1,4 @@
-let currentDays = 90;
+let currentDays = 30;
 let charts = {};
 
 async function fetchMetrics() {
