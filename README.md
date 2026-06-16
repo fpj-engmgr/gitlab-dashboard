@@ -1,11 +1,17 @@
 # GitLab Dashboard
 
-A web dashboard for monitoring GitLab metrics across the Red Hat RHEL AI project tree. Tracks merge requests, code review metrics, commit activity, and contributor statistics.
+A web dashboard for monitoring GitLab metrics for your engineering team. Uses a **team-member-first approach** - you specify your team members, and the dashboard tracks their contributions across all projects in a GitLab group.
+
+## Key Benefits
+
+- **Fast & Efficient**: Queries only your team members' contributions instead of scanning all projects
+- **Scales to Large Groups**: Works efficiently even with hundreds or thousands of projects
+- **Team-Focused**: See exactly what your team is working on, filtered from the noise
 
 ## Features
 
 - **Merge Request Metrics**: Track total, merged, open, and closed MRs with average time to merge
-- **Code Review Metrics**: Monitor MR review activity and trends
+- **Code Review Metrics**: Monitor MR review activity and trends  
 - **Commit Activity**: Visualize commits over time by project and contributor
 - **Contributor Stats**: See top contributors and their activity levels
 - **SQLite Caching**: Fast dashboard loads with automatic cache refresh
@@ -52,7 +58,7 @@ A web dashboard for monitoring GitLab metrics across the Red Hat RHEL AI project
    TEAM_MEMBERS_FILE=team_members.json
    ```
 
-6. **(Optional) Configure team member filtering**:
+6. **Configure team members (REQUIRED)**:
    ```bash
    cp team_members.json.example team_members.json
    ```
@@ -68,7 +74,7 @@ A web dashboard for monitoring GitLab metrics across the Red Hat RHEL AI project
    }
    ```
    
-   **Note**: If you skip this step, the dashboard will show metrics for ALL contributors in the group. Only create `team_members.json` if you want to filter to specific team members.
+   **Important**: This file is required. The dashboard uses a team-member-first approach, querying GitLab for each person's contributions. This is much more efficient than scanning all projects, especially for large groups with hundreds of projects.
 
 ## Getting a GitLab Personal Access Token
 
@@ -113,9 +119,9 @@ Edit `.env` to customize:
 - `CACHE_DURATION_HOURS`: How long to cache data before refreshing (default: 1 hour)
 - `TEAM_MEMBERS_FILE`: Path to JSON file with team member usernames (default: team_members.json)
 
-### Team Member Filtering
+### Team Member Configuration (Required)
 
-Create a `team_members.json` file to track metrics only for specific team members:
+The dashboard uses a **team-member-first approach**. You must create a `team_members.json` file listing your team's GitLab usernames:
 
 ```json
 {
@@ -127,10 +133,15 @@ Create a `team_members.json` file to track metrics only for specific team member
 }
 ```
 
-If this file doesn't exist or is empty, the dashboard will show metrics for ALL contributors in the GitLab group. This is useful for:
-- Tracking specific team metrics across shared projects
-- Excluding bot accounts or external contributors
-- Focusing on your engineering team's performance
+**How it works:**
+1. Dashboard loads the list of team members from this file
+2. For each team member, queries GitLab for their MRs and commits across the entire group
+3. Aggregates and displays metrics only for your team
+
+**Benefits:**
+- Much faster than scanning all projects (especially for groups with 100+ projects)
+- Only tracks your team's work, excluding external contributors and bots
+- Scales efficiently to large GitLab groups
 
 ## Project Structure
 

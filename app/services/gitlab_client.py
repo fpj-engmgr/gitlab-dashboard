@@ -12,52 +12,39 @@ class GitLabClient:
         self.gl = gitlab.Gitlab(settings.gitlab_url, private_token=settings.gitlab_token)
         self.group_path = settings.gitlab_group
         self.team_members = settings.get_team_members()
-
-    def is_team_member(self, username: str) -> bool:
-        """Check if a username is in the team members list. Returns True if no filter is set."""
-        if self.team_members is None:
-            return True
-        return username in self.team_members
+        logger.info(f"Initialized GitLab client for group: {self.group_path}")
+        logger.info(f"Tracking {len(self.team_members)} team members: {', '.join(self.team_members)}")
 
     def get_group(self):
         """Get the GitLab group."""
         return self.gl.groups.get(self.group_path)
 
-    def get_all_projects(self) -> List[Any]:
-        """Get all projects under the group tree."""
+    def get_merge_requests_for_member(self, username: str, days: int = 30) -> List[Dict[str, Any]]:
+        """Fetch merge requests authored by a specific team member."""
         group = self.get_group()
-        projects = group.projects.list(include_subgroups=True, get_all=True)
-        return projects
-
-    def get_merge_requests(self, days: int = 30) -> List[Dict[str, Any]]:
-        """Fetch merge requests from all projects in the group."""
-        projects = self.get_all_projects()
-        all_mrs = []
-        errors = []
+        mrs = []
 
         since = datetime.utcnow() - timedelta(days=days)
 
-        for project in projects:
-            try:
-                full_project = self.gl.projects.get(project.id)
-                mrs = full_project.mergerequests.list(
-                    updated_after=since.isoformat(),
-                    get_all=True
-                )
+        try:
+            # Query group-level MRs filtered by author
+            group_mrs = group.mergerequests.list(
+                author_username=username,
+                updated_after=since.isoformat(),
+                get_all=True
+            )
 
-                for mr in mrs:
-                    author_username = mr.author.get('username', 'unknown')
+            logger.info(f"Found {len(group_mrs)} MRs for {username}")
 
-                    if not self.is_team_member(author_username):
-                        continue
-
+            for mr in group_mrs:
+                try:
                     mr_data = {
-                        'project_id': project.id,
-                        'project_name': project.name,
+                        'project_id': mr.project_id,
+                        'project_name': getattr(mr, 'references', {}).get('full', 'unknown').split('!')[0],
                         'iid': mr.iid,
                         'title': mr.title,
                         'state': mr.state,
-                        'author': author_username,
+                        'author': username,
                         'created_at': datetime.fromisoformat(mr.created_at.replace('Z', '+00:00')),
                         'updated_at': datetime.fromisoformat(mr.updated_at.replace('Z', '+00:00')),
                         'merged_at': datetime.fromisoformat(mr.merged_at.replace('Z', '+00:00')) if mr.merged_at else None,
@@ -73,91 +60,190 @@ class GitLabClient:
                     else:
                         mr_data['time_to_merge_hours'] = None
 
-                    all_mrs.append(mr_data)
-            except gitlab.exceptions.GitlabAuthenticationError as e:
-                logger.error(f"Authentication error for project {project.name} (ID: {project.id}): {e}")
-                errors.append(f"Auth error: {project.name}")
-                continue
-            except gitlab.exceptions.GitlabGetError as e:
-                if e.response_code == 403:
-                    logger.warning(f"No access to project {project.name} (ID: {project.id}) - skipping")
-                    errors.append(f"403: {project.name}")
-                else:
-                    logger.error(f"Error fetching MRs for project {project.name}: {e}")
-                    errors.append(f"Error: {project.name}")
-                continue
-            except Exception as e:
-                logger.error(f"Unexpected error for project {project.name}: {e}")
-                errors.append(f"Unexpected: {project.name}")
-                continue
+                    mrs.append(mr_data)
+                except Exception as e:
+                    logger.warning(f"Error processing MR {mr.iid} for {username}: {e}")
+                    continue
 
-        if errors:
-            logger.info(f"Skipped {len(errors)} projects due to access restrictions")
+        except gitlab.exceptions.GitlabAuthenticationError as e:
+            logger.error(f"Authentication error fetching MRs for {username}: {e}")
+        except gitlab.exceptions.GitlabGetError as e:
+            logger.error(f"Error fetching MRs for {username}: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error fetching MRs for {username}: {e}")
 
+        return mrs
+
+    def get_merge_requests(self, days: int = 30) -> List[Dict[str, Any]]:
+        """Fetch merge requests for all team members."""
+        all_mrs = []
+
+        for username in self.team_members:
+            logger.info(f"Fetching MRs for team member: {username}")
+            member_mrs = self.get_merge_requests_for_member(username, days)
+            all_mrs.extend(member_mrs)
+
+        logger.info(f"Total MRs fetched across all team members: {len(all_mrs)}")
         return all_mrs
 
-    def get_commits(self, days: int = 30) -> List[Dict[str, Any]]:
-        """Fetch commits from all projects in the group."""
-        projects = self.get_all_projects()
+    def get_commits_for_member(self, username: str, days: int = 30) -> List[Dict[str, Any]]:
+        """Fetch commits authored by a specific team member across all projects."""
         all_commits = []
-        errors = []
 
         since = datetime.utcnow() - timedelta(days=days)
 
-        for project in projects:
-            try:
-                full_project = self.gl.projects.get(project.id)
-                commits = full_project.commits.list(
-                    since=since.isoformat(),
-                    get_all=True
-                )
+        try:
+            # Get all projects in the group
+            group = self.get_group()
+            projects = group.projects.list(include_subgroups=True, get_all=True)
 
-                for commit in commits:
-                    commit_data = {
-                        'id': commit.id,
-                        'project_id': project.id,
-                        'project_name': project.name,
-                        'author_name': commit.author_name,
-                        'author_email': commit.author_email,
-                        'committed_date': datetime.fromisoformat(commit.committed_date.replace('Z', '+00:00')),
-                        'title': commit.title,
-                        'message': commit.message,
-                        'web_url': commit.web_url,
-                    }
-                    all_commits.append(commit_data)
-            except gitlab.exceptions.GitlabAuthenticationError as e:
-                logger.error(f"Authentication error for project {project.name} (ID: {project.id}): {e}")
-                errors.append(f"Auth error: {project.name}")
-                continue
-            except gitlab.exceptions.GitlabGetError as e:
-                if e.response_code == 403:
-                    logger.warning(f"No access to project {project.name} (ID: {project.id}) - skipping")
-                    errors.append(f"403: {project.name}")
-                else:
-                    logger.error(f"Error fetching commits for project {project.name}: {e}")
-                    errors.append(f"Error: {project.name}")
-                continue
-            except Exception as e:
-                logger.error(f"Unexpected error for project {project.name}: {e}")
-                errors.append(f"Unexpected: {project.name}")
-                continue
+            logger.info(f"Scanning {len(projects)} projects for {username}'s commits")
 
-        if errors:
-            logger.info(f"Skipped {len(errors)} projects due to access restrictions")
+            accessible_projects = 0
+            for project in projects:
+                try:
+                    full_project = self.gl.projects.get(project.id)
+
+                    # Query commits by author
+                    commits = full_project.commits.list(
+                        since=since.isoformat(),
+                        all=True,
+                        get_all=True
+                    )
+
+                    accessible_projects += 1
+
+                    for commit in commits:
+                        # Filter by author email matching username
+                        author_email = commit.author_email.lower()
+                        if username.lower() in author_email or author_email.startswith(username.lower()):
+                            commit_data = {
+                                'id': commit.id,
+                                'project_id': project.id,
+                                'project_name': project.name,
+                                'author_name': commit.author_name,
+                                'author_email': commit.author_email,
+                                'committed_date': datetime.fromisoformat(commit.committed_date.replace('Z', '+00:00')),
+                                'title': commit.title,
+                                'message': commit.message,
+                                'web_url': commit.web_url,
+                            }
+                            all_commits.append(commit_data)
+
+                except gitlab.exceptions.GitlabGetError as e:
+                    if e.response_code == 403:
+                        continue  # Skip inaccessible projects silently
+                    else:
+                        logger.debug(f"Error accessing project {project.name}: {e}")
+                        continue
+                except Exception as e:
+                    logger.debug(f"Error fetching commits from project {project.name}: {e}")
+                    continue
+
+            logger.info(f"Found {len(all_commits)} commits for {username} across {accessible_projects} accessible projects")
+
+        except Exception as e:
+            logger.error(f"Unexpected error fetching commits for {username}: {e}")
 
         return all_commits
 
-    def get_contributor_stats(self, commits: List[Dict[str, Any]], mrs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Calculate contributor statistics from commits and MRs."""
-        contributors = {}
-        username_to_email = {}
+    def get_commits(self, days: int = 30) -> List[Dict[str, Any]]:
+        """Fetch commits for all team members."""
+        all_commits = []
 
+        for username in self.team_members:
+            logger.info(f"Fetching commits for team member: {username}")
+            member_commits = self.get_commits_for_member(username, days)
+            all_commits.extend(member_commits)
+
+        logger.info(f"Total commits fetched across all team members: {len(all_commits)}")
+        return all_commits
+
+    def get_comments_for_member(self, username: str, days: int = 30) -> List[Dict[str, Any]]:
+        """Fetch MR comments/notes authored by a specific team member."""
+        all_comments = []
+
+        since = datetime.utcnow() - timedelta(days=days)
+
+        try:
+            group = self.get_group()
+
+            # Get all MRs in the group (not just the member's MRs, since they may comment on others' MRs)
+            group_mrs = group.mergerequests.list(
+                updated_after=since.isoformat(),
+                get_all=True
+            )
+
+            logger.info(f"Scanning {len(group_mrs)} MRs for {username}'s comments")
+
+            for mr in group_mrs:
+                try:
+                    # Get the full project to access MR notes
+                    project = self.gl.projects.get(mr.project_id)
+                    full_mr = project.mergerequests.get(mr.iid)
+
+                    # Get all notes/comments on this MR
+                    notes = full_mr.notes.list(get_all=True)
+
+                    for note in notes:
+                        # Filter to comments by this team member
+                        if note.author.get('username') == username:
+                            # Skip system notes (like "changed the title")
+                            if note.system:
+                                continue
+
+                            comment_data = {
+                                'note_id': note.id,
+                                'mr_id': mr.id,
+                                'project_id': mr.project_id,
+                                'project_name': getattr(mr, 'references', {}).get('full', 'unknown').split('!')[0],
+                                'author': username,
+                                'body': note.body,
+                                'created_at': datetime.fromisoformat(note.created_at.replace('Z', '+00:00')),
+                                'updated_at': datetime.fromisoformat(note.updated_at.replace('Z', '+00:00')),
+                                'mr_title': mr.title,
+                                'web_url': note.noteable_iid and f"{project.web_url}/-/merge_requests/{mr.iid}#note_{note.id}" or mr.web_url,
+                            }
+                            all_comments.append(comment_data)
+
+                except gitlab.exceptions.GitlabGetError as e:
+                    if e.response_code == 403:
+                        continue  # Skip inaccessible projects
+                    logger.debug(f"Error accessing MR notes: {e}")
+                    continue
+                except Exception as e:
+                    logger.debug(f"Error processing MR {mr.iid}: {e}")
+                    continue
+
+            logger.info(f"Found {len(all_comments)} comments for {username}")
+
+        except Exception as e:
+            logger.error(f"Unexpected error fetching comments for {username}: {e}")
+
+        return all_comments
+
+    def get_comments(self, days: int = 30) -> List[Dict[str, Any]]:
+        """Fetch comments for all team members."""
+        all_comments = []
+
+        for username in self.team_members:
+            logger.info(f"Fetching comments for team member: {username}")
+            member_comments = self.get_comments_for_member(username, days)
+            all_comments.extend(member_comments)
+
+        logger.info(f"Total comments fetched across all team members: {len(all_comments)}")
+        return all_comments
+
+    def get_contributor_stats(self, commits: List[Dict[str, Any]], mrs: List[Dict[str, Any]], comments: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """Calculate contributor statistics from commits, MRs, and comments."""
+        contributors = {}
+        if comments is None:
+            comments = []
+
+        # Process commits
         for commit in commits:
             email = commit['author_email']
             username = commit['author_email'].split('@')[0]
-
-            if not self.is_team_member(username):
-                continue
 
             if email not in contributors:
                 contributors[email] = {
@@ -166,18 +252,54 @@ class GitLabClient:
                     'email': email,
                     'commit_count': 0,
                     'mr_count': 0,
+                    'comment_count': 0,
                     'last_activity': commit['committed_date']
                 }
-                username_to_email[username] = email
 
             contributors[email]['commit_count'] += 1
             if commit['committed_date'] > contributors[email]['last_activity']:
                 contributors[email]['last_activity'] = commit['committed_date']
 
+        # Process MRs
         for mr in mrs:
             author = mr['author']
-            if author in username_to_email:
-                email = username_to_email[author]
-                contributors[email]['mr_count'] += 1
+            # Find matching contributor by username
+            for email, contrib in contributors.items():
+                if contrib['username'] == author or email.startswith(author + '@'):
+                    contrib['mr_count'] += 1
+                    break
+            else:
+                # MR author not in commits, create entry
+                contributors[f"{author}@unknown"] = {
+                    'username': author,
+                    'name': author,
+                    'email': f"{author}@unknown",
+                    'commit_count': 0,
+                    'mr_count': 1,
+                    'comment_count': 0,
+                    'last_activity': mr['updated_at']
+                }
+
+        # Process comments
+        for comment in comments:
+            author = comment['author']
+            # Find matching contributor by username
+            for email, contrib in contributors.items():
+                if contrib['username'] == author or email.startswith(author + '@'):
+                    contrib['comment_count'] += 1
+                    if comment['created_at'] > contrib['last_activity']:
+                        contrib['last_activity'] = comment['created_at']
+                    break
+            else:
+                # Comment author not in commits/MRs, create entry
+                contributors[f"{author}@unknown"] = {
+                    'username': author,
+                    'name': author,
+                    'email': f"{author}@unknown",
+                    'commit_count': 0,
+                    'mr_count': 0,
+                    'comment_count': 1,
+                    'last_activity': comment['created_at']
+                }
 
         return list(contributors.values())

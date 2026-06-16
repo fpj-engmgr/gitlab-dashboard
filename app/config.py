@@ -14,18 +14,29 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
-    def get_team_members(self) -> Optional[List[str]]:
-        """Load team member usernames from JSON file. Returns None if file doesn't exist (no filtering)."""
+    def get_team_members(self) -> List[str]:
+        """Load team member usernames from JSON file. Required for dashboard operation."""
         team_file = Path(self.team_members_file)
         if not team_file.exists():
-            return None
+            raise FileNotFoundError(
+                f"Team members file '{self.team_members_file}' not found. "
+                f"Create it from team_members.json.example with your team's GitLab usernames."
+            )
 
         try:
             with open(team_file, 'r') as f:
                 data = json.load(f)
-                return data.get('team_members', [])
-        except (json.JSONDecodeError, KeyError):
-            return None
+                members = data.get('team_members', [])
+
+                if not members:
+                    raise ValueError(
+                        f"No team members found in {self.team_members_file}. "
+                        f"Add GitLab usernames to the 'team_members' array."
+                    )
+
+                return members
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in {self.team_members_file}: {e}")
 
 
 settings = Settings()

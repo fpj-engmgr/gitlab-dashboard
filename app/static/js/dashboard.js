@@ -5,13 +5,14 @@ async function fetchMetrics() {
     try {
         showLoading();
 
-        const [mrData, commitData, contributorData] = await Promise.all([
+        const [mrData, commitData, contributorData, commentData] = await Promise.all([
             fetch(`/api/metrics/merge-requests?days=${currentDays}`).then(r => r.json()),
             fetch(`/api/metrics/commits?days=${currentDays}`).then(r => r.json()),
-            fetch(`/api/metrics/contributors?days=${currentDays}`).then(r => r.json())
+            fetch(`/api/metrics/contributors?days=${currentDays}`).then(r => r.json()),
+            fetch(`/api/metrics/comments?days=${currentDays}`).then(r => r.json())
         ]);
 
-        updateMetricCards(mrData, commitData, contributorData);
+        updateMetricCards(mrData, commitData, contributorData, commentData);
         updateCharts(mrData, commitData, contributorData);
         updateTables(mrData, contributorData);
 
@@ -41,13 +42,14 @@ function showError(message) {
     container.insertBefore(errorDiv, container.firstChild);
 }
 
-function updateMetricCards(mrData, commitData, contributorData) {
+function updateMetricCards(mrData, commitData, contributorData, commentData) {
     document.getElementById('total-mrs').textContent = mrData.total;
     document.getElementById('merged-mrs').textContent = mrData.merged;
     document.getElementById('open-mrs').textContent = mrData.open;
     document.getElementById('avg-merge-time').textContent = mrData.avg_time_to_merge_hours.toFixed(1);
     document.getElementById('total-commits').textContent = commitData.total;
     document.getElementById('total-contributors').textContent = contributorData.total_contributors;
+    document.getElementById('total-comments').textContent = commentData.total;
 }
 
 function updateCharts(mrData, commitData, contributorData) {
@@ -242,6 +244,7 @@ function updateContributorTable(contributors) {
             <td>${contrib.username}</td>
             <td>${contrib.commit_count}</td>
             <td>${contrib.mr_count}</td>
+            <td>${contrib.comment_count}</td>
             <td>${contrib.last_activity ? new Date(contrib.last_activity).toLocaleDateString() : 'N/A'}</td>
         `;
         tbody.appendChild(row);

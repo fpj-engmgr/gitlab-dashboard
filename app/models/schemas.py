@@ -37,6 +37,22 @@ class Commit(Base):
     web_url = Column(String)
 
 
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    note_id = Column(Integer, unique=True)
+    mr_id = Column(Integer, index=True)
+    project_id = Column(Integer, index=True)
+    project_name = Column(String)
+    author = Column(String)
+    body = Column(String)
+    created_at = Column(DateTime)
+    updated_at = Column(DateTime)
+    mr_title = Column(String)
+    web_url = Column(String)
+
+
 class Contributor(Base):
     __tablename__ = "contributors"
 
@@ -46,6 +62,7 @@ class Contributor(Base):
     email = Column(String)
     commit_count = Column(Integer, default=0)
     mr_count = Column(Integer, default=0)
+    comment_count = Column(Integer, default=0)
     last_activity = Column(DateTime, nullable=True)
 
 

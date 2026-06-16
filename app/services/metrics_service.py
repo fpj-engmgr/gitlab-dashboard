@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from app.models.schemas import MergeRequest, Commit, Contributor, CacheMetadata
+from app.models.schemas import MergeRequest, Commit, Comment, Contributor, CacheMetadata
 from app.services.gitlab_client import GitLabClient
 from app.config import settings
 
@@ -69,12 +69,26 @@ class MetricsService:
         self.db.commit()
         self.update_cache_metadata("commits")
 
+    def refresh_comments(self, days: int = 30):
+        """Refresh comments cache."""
+        comments_data = self.gitlab_client.get_comments(days=days)
+
+        self.db.query(Comment).delete()
+
+        for comment_data in comments_data:
+            comment = Comment(**comment_data)
+            self.db.add(comment)
+
+        self.db.commit()
+        self.update_cache_metadata("comments")
+
     def refresh_contributors(self, days: int = 30):
         """Refresh contributors cache."""
         commits_data = self.gitlab_client.get_commits(days=days)
         mrs_data = self.gitlab_client.get_merge_requests(days=days)
+        comments_data = self.gitlab_client.get_comments(days=days)
 
-        contributors_data = self.gitlab_client.get_contributor_stats(commits_data, mrs_data)
+        contributors_data = self.gitlab_client.get_contributor_stats(commits_data, mrs_data, comments_data)
 
         self.db.query(Contributor).delete()
 
@@ -164,6 +178,44 @@ class MetricsService:
             ]
         }
 
+    def get_comment_metrics(self, days: int = 30):
+        """Get comment/review metrics from cache or refresh if needed."""
+        if self.should_refresh_cache("comments"):
+            self.refresh_comments(days=days)
+
+        comments = self.db.query(Comment).all()
+
+        total_comments = len(comments)
+
+        comments_by_author = {}
+        for comment in comments:
+            if comment.author not in comments_by_author:
+                comments_by_author[comment.author] = 0
+            comments_by_author[comment.author] += 1
+
+        comments_by_day = {}
+        for comment in comments:
+            day = comment.created_at.date().isoformat()
+            if day not in comments_by_day:
+                comments_by_day[day] = 0
+            comments_by_day[day] += 1
+
+        return {
+            "total": total_comments,
+            "by_author": comments_by_author,
+            "by_day": comments_by_day,
+            "recent_comments": [
+                {
+                    "author": comment.author,
+                    "mr_title": comment.mr_title,
+                    "body": comment.body[:200],  # Truncate long comments
+                    "created_at": comment.created_at.isoformat(),
+                    "web_url": comment.web_url,
+                }
+                for comment in sorted(comments, key=lambda c: c.created_at, reverse=True)[:20]
+            ]
+        }
+
     def get_contributor_metrics(self, days: int = 30):
         """Get contributor metrics from cache or refresh if needed."""
         if self.should_refresh_cache("contributors"):
@@ -174,6 +226,7 @@ class MetricsService:
         total_contributors = len(contributors)
         total_commits = sum(c.commit_count for c in contributors)
         total_mrs = sum(c.mr_count for c in contributors)
+        total_comments = sum(c.comment_count for c in contributors)
 
         top_contributors = sorted(contributors, key=lambda c: c.commit_count, reverse=True)[:10]
 
@@ -181,12 +234,14 @@ class MetricsService:
             "total_contributors": total_contributors,
             "total_commits": total_commits,
             "total_mrs": total_mrs,
+            "total_comments": total_comments,
             "top_contributors": [
                 {
                     "name": c.name,
                     "username": c.username,
                     "commit_count": c.commit_count,
                     "mr_count": c.mr_count,
+                    "comment_count": c.comment_count,
                     "last_activity": c.last_activity.isoformat() if c.last_activity else None,
                 }
                 for c in top_contributors
