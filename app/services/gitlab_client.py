@@ -87,65 +87,90 @@ class GitLabClient:
         return all_mrs
 
     def get_commits_for_member(self, username: str, days: int = 30) -> List[Dict[str, Any]]:
-        """Fetch commits authored by a specific team member across all projects."""
-        all_commits = []
+        """Fetch commits using user events API filtered by date range, then filter to our group."""
+        all_commits = {}  # Use dict to deduplicate by commit ID
 
         since = datetime.utcnow() - timedelta(days=days)
 
         try:
-            # Get all projects in the group
-            group = self.get_group()
-            projects = group.projects.list(include_subgroups=True, get_all=True)
+            # Get the user object
+            users = self.gl.users.list(username=username)
+            if not users:
+                logger.warning(f"User {username} not found")
+                return []
 
-            logger.info(f"Scanning {len(projects)} projects for {username}'s commits")
+            user = users[0]
 
-            accessible_projects = 0
-            for project in projects:
+            # Fetch user events filtered by date range using 'after' parameter
+            # This is efficient - GitLab filters server-side
+            events = self.gl.users.get(user.id).events.list(
+                after=since.date().isoformat(),
+                get_all=True
+            )
+
+            logger.info(f"Fetched {len(events)} events for {username} since {since.date()}")
+
+            # Filter to push events within our group
+            for event in events:
+                # Only process push events
+                if event.action_name != 'pushed to':
+                    continue
+
                 try:
-                    full_project = self.gl.projects.get(project.id)
+                    # Get push event details
+                    push_data = event.push_data
+                    if not push_data:
+                        continue
 
-                    # Query commits by author
-                    commits = full_project.commits.list(
-                        since=since.isoformat(),
-                        all=True,
-                        get_all=True
-                    )
+                    project_id = event.project_id
+                    commit_to = push_data.get('commit_to')
 
-                    accessible_projects += 1
+                    if not commit_to:
+                        continue
 
-                    for commit in commits:
-                        # Filter by author email matching username
-                        author_email = commit.author_email.lower()
-                        if username.lower() in author_email or author_email.startswith(username.lower()):
-                            commit_data = {
-                                'id': commit.id,
-                                'project_id': project.id,
-                                'project_name': project.name,
-                                'author_name': commit.author_name,
-                                'author_email': commit.author_email,
-                                'committed_date': datetime.fromisoformat(commit.committed_date.replace('Z', '+00:00')),
-                                'title': commit.title,
-                                'message': commit.message,
-                                'web_url': commit.web_url,
-                            }
-                            all_commits.append(commit_data)
+                    # Fetch the project to check if it's in our group
+                    project = self.gl.projects.get(project_id)
+
+                    # Filter to projects within our group
+                    if not project.path_with_namespace.startswith(self.group_path):
+                        continue
+
+                    # Fetch the actual commit
+                    commit = project.commits.get(commit_to)
+                    commit_date = datetime.fromisoformat(commit.committed_date.replace('Z', '+00:00'))
+
+                    # Double-check date is within range (events API might return slightly outside)
+                    if commit_date < since:
+                        continue
+
+                    commit_data = {
+                        'id': commit.id,
+                        'project_id': project_id,
+                        'project_name': project.name,
+                        'author_name': commit.author_name,
+                        'author_email': commit.author_email,
+                        'committed_date': commit_date,
+                        'title': commit.title,
+                        'message': commit.message,
+                        'web_url': commit.web_url,
+                    }
+                    all_commits[commit.id] = commit_data
 
                 except gitlab.exceptions.GitlabGetError as e:
                     if e.response_code == 403:
-                        continue  # Skip inaccessible projects silently
-                    else:
-                        logger.debug(f"Error accessing project {project.name}: {e}")
                         continue
+                    logger.debug(f"Error fetching commit details: {e}")
+                    continue
                 except Exception as e:
-                    logger.debug(f"Error fetching commits from project {project.name}: {e}")
+                    logger.debug(f"Error processing push event: {e}")
                     continue
 
-            logger.info(f"Found {len(all_commits)} commits for {username} across {accessible_projects} accessible projects")
+            logger.info(f"Found {len(all_commits)} commits for {username} in group {self.group_path}")
 
         except Exception as e:
             logger.error(f"Unexpected error fetching commits for {username}: {e}")
 
-        return all_commits
+        return list(all_commits.values())
 
     def get_commits(self, days: int = 30) -> List[Dict[str, Any]]:
         """Fetch commits for all team members."""
