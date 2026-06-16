@@ -2,6 +2,9 @@ import gitlab
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from app.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class GitLabClient:
@@ -30,6 +33,7 @@ class GitLabClient:
         """Fetch merge requests from all projects in the group."""
         projects = self.get_all_projects()
         all_mrs = []
+        errors = []
 
         since = datetime.utcnow() - timedelta(days=days)
 
@@ -70,9 +74,25 @@ class GitLabClient:
                         mr_data['time_to_merge_hours'] = None
 
                     all_mrs.append(mr_data)
-            except Exception as e:
-                print(f"Error fetching MRs for project {project.name}: {e}")
+            except gitlab.exceptions.GitlabAuthenticationError as e:
+                logger.error(f"Authentication error for project {project.name} (ID: {project.id}): {e}")
+                errors.append(f"Auth error: {project.name}")
                 continue
+            except gitlab.exceptions.GitlabGetError as e:
+                if e.response_code == 403:
+                    logger.warning(f"No access to project {project.name} (ID: {project.id}) - skipping")
+                    errors.append(f"403: {project.name}")
+                else:
+                    logger.error(f"Error fetching MRs for project {project.name}: {e}")
+                    errors.append(f"Error: {project.name}")
+                continue
+            except Exception as e:
+                logger.error(f"Unexpected error for project {project.name}: {e}")
+                errors.append(f"Unexpected: {project.name}")
+                continue
+
+        if errors:
+            logger.info(f"Skipped {len(errors)} projects due to access restrictions")
 
         return all_mrs
 
@@ -80,6 +100,7 @@ class GitLabClient:
         """Fetch commits from all projects in the group."""
         projects = self.get_all_projects()
         all_commits = []
+        errors = []
 
         since = datetime.utcnow() - timedelta(days=days)
 
@@ -104,9 +125,25 @@ class GitLabClient:
                         'web_url': commit.web_url,
                     }
                     all_commits.append(commit_data)
-            except Exception as e:
-                print(f"Error fetching commits for project {project.name}: {e}")
+            except gitlab.exceptions.GitlabAuthenticationError as e:
+                logger.error(f"Authentication error for project {project.name} (ID: {project.id}): {e}")
+                errors.append(f"Auth error: {project.name}")
                 continue
+            except gitlab.exceptions.GitlabGetError as e:
+                if e.response_code == 403:
+                    logger.warning(f"No access to project {project.name} (ID: {project.id}) - skipping")
+                    errors.append(f"403: {project.name}")
+                else:
+                    logger.error(f"Error fetching commits for project {project.name}: {e}")
+                    errors.append(f"Error: {project.name}")
+                continue
+            except Exception as e:
+                logger.error(f"Unexpected error for project {project.name}: {e}")
+                errors.append(f"Unexpected: {project.name}")
+                continue
+
+        if errors:
+            logger.info(f"Skipped {len(errors)} projects due to access restrictions")
 
         return all_commits
 
