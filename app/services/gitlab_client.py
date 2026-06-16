@@ -75,15 +75,64 @@ class GitLabClient:
         return mrs
 
     def get_merge_requests(self, days: int = 30) -> List[Dict[str, Any]]:
-        """Fetch merge requests for all team members."""
+        """Fetch ALL merge requests in one pass, then filter to team members."""
         all_mrs = []
 
-        for username in self.team_members:
-            logger.info(f"Fetching MRs for team member: {username}")
-            member_mrs = self.get_merge_requests_for_member(username, days)
-            all_mrs.extend(member_mrs)
+        since = datetime.utcnow() - timedelta(days=days)
+        team_members_set = set(self.team_members)
 
-        logger.info(f"Total MRs fetched across all team members: {len(all_mrs)}")
+        try:
+            group = self.get_group()
+
+            # Single API call to get ALL MRs in the group
+            logger.info(f"Fetching all MRs from group {self.group_path} (single pass)")
+            group_mrs = group.mergerequests.list(
+                updated_after=since.isoformat(),
+                get_all=True
+            )
+
+            logger.info(f"Fetched {len(group_mrs)} total MRs, filtering to team members")
+
+            # Filter to team members
+            for mr in group_mrs:
+                try:
+                    author = mr.author.get('username', 'unknown')
+
+                    # Skip if not a team member
+                    if author not in team_members_set:
+                        continue
+
+                    mr_data = {
+                        'project_id': mr.project_id,
+                        'project_name': getattr(mr, 'references', {}).get('full', 'unknown').split('!')[0],
+                        'iid': mr.iid,
+                        'title': mr.title,
+                        'state': mr.state,
+                        'author': author,
+                        'created_at': datetime.fromisoformat(mr.created_at.replace('Z', '+00:00')),
+                        'updated_at': datetime.fromisoformat(mr.updated_at.replace('Z', '+00:00')),
+                        'merged_at': datetime.fromisoformat(mr.merged_at.replace('Z', '+00:00')) if mr.merged_at else None,
+                        'closed_at': datetime.fromisoformat(mr.closed_at.replace('Z', '+00:00')) if mr.closed_at else None,
+                        'source_branch': mr.source_branch,
+                        'target_branch': mr.target_branch,
+                        'web_url': mr.web_url,
+                    }
+
+                    if mr_data['merged_at'] and mr_data['created_at']:
+                        time_diff = mr_data['merged_at'] - mr_data['created_at']
+                        mr_data['time_to_merge_hours'] = time_diff.total_seconds() / 3600
+                    else:
+                        mr_data['time_to_merge_hours'] = None
+
+                    all_mrs.append(mr_data)
+                except Exception as e:
+                    logger.warning(f"Error processing MR {mr.iid}: {e}")
+                    continue
+
+        except Exception as e:
+            logger.error(f"Error fetching MRs: {e}")
+
+        logger.info(f"Found {len(all_mrs)} MRs from {len(team_members_set)} team members")
         return all_mrs
 
     def get_commits_for_member(self, username: str, days: int = 30) -> List[Dict[str, Any]]:
@@ -173,16 +222,92 @@ class GitLabClient:
         return list(all_commits.values())
 
     def get_commits(self, days: int = 30) -> List[Dict[str, Any]]:
-        """Fetch commits for all team members."""
-        all_commits = []
+        """Fetch commits for all team members in a single optimized pass."""
+        all_commits = {}  # Use dict to deduplicate by commit ID
+
+        since = datetime.utcnow() - timedelta(days=days)
+        team_members_set = set(self.team_members)
+
+        logger.info(f"Fetching commits for {len(self.team_members)} team members (optimized single pass)")
+
+        # Strategy: Fetch events for each user, but batch the processing
+        # Unfortunately GitLab doesn't have a multi-user events endpoint,
+        # but we can optimize by processing events more efficiently
 
         for username in self.team_members:
-            logger.info(f"Fetching commits for team member: {username}")
-            member_commits = self.get_commits_for_member(username, days)
-            all_commits.extend(member_commits)
+            try:
+                # Get the user object
+                users = self.gl.users.list(username=username)
+                if not users:
+                    logger.debug(f"User {username} not found")
+                    continue
 
-        logger.info(f"Total commits fetched across all team members: {len(all_commits)}")
-        return all_commits
+                user = users[0]
+
+                # Fetch user events filtered by date range using 'after' parameter
+                events = self.gl.users.get(user.id).events.list(
+                    after=since.date().isoformat(),
+                    get_all=True
+                )
+
+                # Filter to push events within our group
+                for event in events:
+                    if event.action_name != 'pushed to':
+                        continue
+
+                    try:
+                        push_data = event.push_data
+                        if not push_data:
+                            continue
+
+                        project_id = event.project_id
+                        commit_to = push_data.get('commit_to')
+
+                        if not commit_to or commit_to in all_commits:
+                            continue
+
+                        # Fetch the project to check if it's in our group
+                        project = self.gl.projects.get(project_id)
+
+                        # Filter to projects within our group
+                        if not project.path_with_namespace.startswith(self.group_path):
+                            continue
+
+                        # Fetch the actual commit
+                        commit = project.commits.get(commit_to)
+                        commit_date = datetime.fromisoformat(commit.committed_date.replace('Z', '+00:00'))
+
+                        if commit_date < since:
+                            continue
+
+                        commit_data = {
+                            'id': commit.id,
+                            'project_id': project_id,
+                            'project_name': project.name,
+                            'author_name': commit.author_name,
+                            'author_email': commit.author_email,
+                            'committed_date': commit_date,
+                            'title': commit.title,
+                            'message': commit.message,
+                            'web_url': commit.web_url,
+                        }
+                        all_commits[commit.id] = commit_data
+
+                    except gitlab.exceptions.GitlabGetError as e:
+                        if e.response_code == 403:
+                            continue
+                        logger.debug(f"Error fetching commit details: {e}")
+                        continue
+                    except Exception as e:
+                        logger.debug(f"Error processing push event: {e}")
+                        continue
+
+            except Exception as e:
+                logger.debug(f"Error fetching commits for {username}: {e}")
+                continue
+
+        logger.info(f"Found {len(all_commits)} unique commits across all team members")
+        return list(all_commits.values())
 
     def get_comments_for_member(self, username: str, days: int = 30) -> List[Dict[str, Any]]:
         """Fetch MR comments/notes authored by a specific team member."""
@@ -248,15 +373,71 @@ class GitLabClient:
         return all_comments
 
     def get_comments(self, days: int = 30) -> List[Dict[str, Any]]:
-        """Fetch comments for all team members."""
+        """Fetch comments for all team members in a single pass through MRs."""
         all_comments = []
 
-        for username in self.team_members:
-            logger.info(f"Fetching comments for team member: {username}")
-            member_comments = self.get_comments_for_member(username, days)
-            all_comments.extend(member_comments)
+        since = datetime.utcnow() - timedelta(days=days)
+        team_members_set = set(self.team_members)
 
-        logger.info(f"Total comments fetched across all team members: {len(all_comments)}")
+        try:
+            group = self.get_group()
+
+            # Single API call to get all MRs
+            logger.info(f"Fetching all MRs to scan for team member comments (single pass)")
+            group_mrs = group.mergerequests.list(
+                updated_after=since.isoformat(),
+                get_all=True
+            )
+
+            logger.info(f"Scanning {len(group_mrs)} MRs for comments from {len(self.team_members)} team members")
+
+            for mr in group_mrs:
+                try:
+                    # Get the full project to access MR notes
+                    project = self.gl.projects.get(mr.project_id)
+                    full_mr = project.mergerequests.get(mr.iid)
+
+                    # Get all notes/comments on this MR
+                    notes = full_mr.notes.list(get_all=True)
+
+                    for note in notes:
+                        # Filter to comments by team members
+                        author = note.author.get('username')
+                        if author not in team_members_set:
+                            continue
+
+                        # Skip system notes (like "changed the title")
+                        if note.system:
+                            continue
+
+                        comment_data = {
+                            'note_id': note.id,
+                            'mr_id': mr.id,
+                            'project_id': mr.project_id,
+                            'project_name': getattr(mr, 'references', {}).get('full', 'unknown').split('!')[0],
+                            'author': author,
+                            'body': note.body,
+                            'created_at': datetime.fromisoformat(note.created_at.replace('Z', '+00:00')),
+                            'updated_at': datetime.fromisoformat(note.updated_at.replace('Z', '+00:00')),
+                            'mr_title': mr.title,
+                            'web_url': f"{project.web_url}/-/merge_requests/{mr.iid}#note_{note.id}",
+                        }
+                        all_comments.append(comment_data)
+
+                except gitlab.exceptions.GitlabGetError as e:
+                    if e.response_code == 403:
+                        continue  # Skip inaccessible projects
+                    logger.debug(f"Error accessing MR notes: {e}")
+                    continue
+                except Exception as e:
+                    logger.debug(f"Error processing MR {mr.iid}: {e}")
+                    continue
+
+            logger.info(f"Found {len(all_comments)} total comments from team members")
+
+        except Exception as e:
+            logger.error(f"Unexpected error fetching comments: {e}")
+
         return all_comments
 
     def get_contributor_stats(self, commits: List[Dict[str, Any]], mrs: List[Dict[str, Any]], comments: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
