@@ -1,24 +1,17 @@
 {
   "groups": [
     {
-      "id": "rhel-ai",
-      "name": "RHEL AI",
-      "path": "redhat/rhel-ai/rhai",
-      "description": "RHEL AI main group",
+      "id": "rhel-ai-core",
+      "name": "RHEL AI Core",
+      "path": "redhat/rhel-ai/core",
+      "description": "RHEL AI Core group",
       "enabled": true
     },
     {
-      "id": "rhel-ai-infra",
-      "name": "RHEL AI Infrastructure",
-      "path": "redhat/rhel-ai/infrastructure",
-      "description": "Infrastructure and tooling",
-      "enabled": true
-    },
-    {
-      "id": "rhel-ai-docs",
-      "name": "RHEL AI Documentation",
-      "path": "redhat/rhel-ai/documentation",
-      "description": "Documentation and guides",
+      "id": "aipcc-docs",
+      "name": "AIPCC Documentation",
+      "path": "redhat/rhel-ai/core/team/docs",
+      "description": "AIPCC documentation and guides",
       "enabled": false
     }
   ]

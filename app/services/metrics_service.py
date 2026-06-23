@@ -110,7 +110,11 @@ class MetricsService:
         """Refresh contributors cache - Phase 1 (fast) or Phase 2 (detailed)."""
 
         # Fetch MRs (fast - single API call, group-scoped)
-        mrs_data = self.gitlab_client.get_merge_requests(days=days)
+        # MultiGroupGitLabClient has get_all_merge_requests, GitLabClient has get_merge_requests
+        if isinstance(self.gitlab_client, MultiGroupGitLabClient):
+            mrs_data = self.gitlab_client.get_all_merge_requests(days=days)
+        else:
+            mrs_data = self.gitlab_client.get_merge_requests(days=days)
 
         # Get contributor stats (fast if fetch_details=False, slow if True)
         contributor_stats = self.gitlab_client.get_contributor_stats_from_mrs(mrs_data, days=days, fetch_details=fetch_details)
