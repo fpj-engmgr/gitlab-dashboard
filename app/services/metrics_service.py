@@ -1,14 +1,34 @@
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
+from typing import Optional, Dict, Any, List
 from app.models.schemas import MergeRequest, Commit, Comment, Contributor, CacheMetadata
 from app.services.gitlab_client import GitLabClient
+from app.services.multi_group_client import MultiGroupGitLabClient
 from app.config import settings
 
 
 class MetricsService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, group_id: Optional[str] = None):
         self.db = db
-        self.gitlab_client = GitLabClient()
+        self.group_id = group_id
+
+        # Use multi-group client if no specific group requested
+        groups = settings.get_groups()
+        if group_id:
+            # Single-group mode: find the specific group config
+            group_config = next((g for g in groups if g['id'] == group_id), None)
+            if group_config:
+                self.gitlab_client = GitLabClient(group_path=group_config['path'], group_id=group_id)
+            else:
+                # Fallback to default
+                self.gitlab_client = GitLabClient(group_id=group_id)
+        elif len(groups) == 1:
+            # Single-group mode (backward compatibility)
+            group = groups[0]
+            self.gitlab_client = GitLabClient(group_path=group['path'], group_id=group['id'])
+        else:
+            # Multi-group mode
+            self.gitlab_client = MultiGroupGitLabClient()
 
     def should_refresh_cache(self, data_type: str) -> bool:
         """Check if cache should be refreshed based on age."""
@@ -45,7 +65,11 @@ class MetricsService:
 
     def refresh_merge_requests(self, days: int = 30):
         """Refresh merge requests cache."""
-        mrs_data = self.gitlab_client.get_merge_requests(days=days)
+        # MultiGroupGitLabClient has get_all_merge_requests, GitLabClient has get_merge_requests
+        if isinstance(self.gitlab_client, MultiGroupGitLabClient):
+            mrs_data = self.gitlab_client.get_all_merge_requests(days=days)
+        else:
+            mrs_data = self.gitlab_client.get_merge_requests(days=days)
 
         self.db.query(MergeRequest).delete()
 
@@ -104,12 +128,18 @@ class MetricsService:
         """Phase 2: Refresh with detailed commit/comment counts (slow background operation)."""
         self.refresh_contributors(days=days, fetch_details=True)
 
-    def get_merge_request_metrics(self, days: int = 30):
-        """Get merge request metrics from cache or refresh if needed."""
+    def get_merge_request_metrics(self, days: int = 30, group_id: Optional[str] = None):
+        """Get merge request metrics, optionally filtered by group."""
         if self.should_refresh_cache("merge_requests"):
             self.refresh_merge_requests(days=days)
 
-        mrs = self.db.query(MergeRequest).all()
+        # Build query with optional group filter
+        query = self.db.query(MergeRequest)
+        if group_id or self.group_id:
+            filter_group = group_id or self.group_id
+            query = query.filter(MergeRequest.group_id == filter_group)
+
+        mrs = query.all()
 
         total = len(mrs)
         merged = len([mr for mr in mrs if mr.state == "merged"])
@@ -122,7 +152,7 @@ class MetricsService:
             if merged_mrs_with_time else 0
         )
 
-        return {
+        result = {
             "total": total,
             "merged": merged,
             "open": open_mrs,
@@ -143,6 +173,30 @@ class MetricsService:
                 for mr in mrs
             ]
         }
+
+        # Add group breakdown if viewing all groups
+        if not (group_id or self.group_id):
+            result["by_group"] = self._get_group_breakdown(self.db.query(MergeRequest).all())
+
+        return result
+
+    def _get_group_breakdown(self, mrs: List[MergeRequest]) -> Dict[str, Any]:
+        """Calculate per-group metrics."""
+        groups = {}
+        for mr in mrs:
+            gid = mr.group_id or "default"
+            if gid not in groups:
+                groups[gid] = {"total": 0, "merged": 0, "open": 0, "closed": 0}
+
+            groups[gid]["total"] += 1
+            if mr.state == "merged":
+                groups[gid]["merged"] += 1
+            elif mr.state == "opened":
+                groups[gid]["open"] += 1
+            elif mr.state == "closed":
+                groups[gid]["closed"] += 1
+
+        return groups
 
     def get_commit_metrics(self, days: int = 30):
         """Get commit metrics - derived from contributor stats (hybrid approach)."""
@@ -169,15 +223,21 @@ class MetricsService:
             "recent_commits": []  # Not available in hybrid mode (would be too slow)
         }
 
-    def get_comment_metrics(self, days: int = 30):
-        """Get comment/review metrics - derived from contributor stats (hybrid approach)."""
+    def get_comment_metrics(self, days: int = 30, group_id: Optional[str] = None):
+        """Get comment/review metrics, optionally filtered by group."""
         # In hybrid mode, we don't populate the comments table (too slow)
         # Instead, derive totals from contributor comment_counts
 
         if self.should_refresh_cache("contributors"):
             self.refresh_contributors(days=days)
 
-        contributors = self.db.query(Contributor).all()
+        # Build query with optional group filter
+        query = self.db.query(Contributor)
+        if group_id or self.group_id:
+            filter_group = group_id or self.group_id
+            query = query.filter(Contributor.group_id == filter_group)
+
+        contributors = query.all()
 
         # Aggregate from contributor stats
         total_comments = sum(c.comment_count for c in contributors)
@@ -199,12 +259,18 @@ class MetricsService:
             "recent_comments": []  # Not available in hybrid mode (would be too slow)
         }
 
-    def get_contributor_metrics(self, days: int = 30):
-        """Get contributor metrics from cache or refresh if needed."""
+    def get_contributor_metrics(self, days: int = 30, group_id: Optional[str] = None):
+        """Get contributor metrics, optionally filtered by group."""
         if self.should_refresh_cache("contributors"):
             self.refresh_contributors(days=days)
 
-        contributors = self.db.query(Contributor).all()
+        # Build query with optional group filter
+        query = self.db.query(Contributor)
+        if group_id or self.group_id:
+            filter_group = group_id or self.group_id
+            query = query.filter(Contributor.group_id == filter_group)
+
+        contributors = query.all()
 
         total_contributors = len(contributors)
         total_commits = sum(c.commit_count for c in contributors)

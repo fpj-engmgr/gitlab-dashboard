@@ -1,20 +1,62 @@
 let currentDays = 30;
+let currentGroup = null;  // Track selected group
 let charts = {};
+
+async function loadGroups() {
+    try {
+        const response = await fetch('/api/groups');
+        const data = await response.json();
+
+        if (data.mode === 'multi') {
+            populateGroupSelector(data.groups);
+            document.getElementById('groupFilter').style.display = 'inline-block';
+            document.querySelector('label[for="groupFilter"]').style.display = 'inline-block';
+        } else {
+            // Hide group selector in single-group mode
+            document.getElementById('groupFilter').style.display = 'none';
+            document.querySelector('label[for="groupFilter"]').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error loading groups:', error);
+    }
+}
+
+function populateGroupSelector(groups) {
+    const selector = document.getElementById('groupFilter');
+    groups.forEach(group => {
+        if (group.enabled) {
+            const option = document.createElement('option');
+            option.value = group.id;
+            option.textContent = group.name;
+            selector.appendChild(option);
+        }
+    });
+}
 
 async function fetchMetrics() {
     try {
         showLoading();
 
+        const groupParam = currentGroup ? `&group_id=${currentGroup}` : '';
+
         const [mrData, commitData, contributorData, commentData] = await Promise.all([
-            fetch(`/api/metrics/merge-requests?days=${currentDays}`).then(r => r.json()),
-            fetch(`/api/metrics/commits?days=${currentDays}`).then(r => r.json()),
-            fetch(`/api/metrics/contributors?days=${currentDays}`).then(r => r.json()),
-            fetch(`/api/metrics/comments?days=${currentDays}`).then(r => r.json())
+            fetch(`/api/metrics/merge-requests?days=${currentDays}${groupParam}`).then(r => r.json()),
+            fetch(`/api/metrics/commits?days=${currentDays}${groupParam}`).then(r => r.json()),
+            fetch(`/api/metrics/contributors?days=${currentDays}${groupParam}`).then(r => r.json()),
+            fetch(`/api/metrics/comments?days=${currentDays}${groupParam}`).then(r => r.json())
         ]);
 
         updateMetricCards(mrData, commitData, contributorData, commentData);
         updateCharts(mrData, commitData, contributorData);
         updateTables(mrData, contributorData);
+
+        // Update group breakdown if viewing all groups
+        if (!currentGroup && mrData.by_group) {
+            updateGroupBreakdown(mrData.by_group);
+            document.getElementById('groupBreakdownContainer').style.display = 'block';
+        } else {
+            document.getElementById('groupBreakdownContainer').style.display = 'none';
+        }
 
         hideLoading();
     } catch (error) {
@@ -305,7 +347,36 @@ function changeDateRange() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    loadGroups();  // Load and populate group selector
     fetchMetrics();
     document.getElementById('refreshBtn').addEventListener('click', refreshData);
     document.getElementById('dateRange').addEventListener('change', changeDateRange);
+    document.getElementById('groupFilter').addEventListener('change', changeGroup);  // New: group filter
 });
+
+function updateGroupBreakdown(groupData) {
+    const container = document.getElementById('groupBreakdown');
+    container.innerHTML = '';
+
+    Object.keys(groupData).forEach(groupId => {
+        const metrics = groupData[groupId];
+        const card = document.createElement('div');
+        card.className = 'group-breakdown-item';
+        card.innerHTML = `
+            <h3>${groupId}</h3>
+            <div class="mini-metrics">
+                <span>Total MRs: ${metrics.total}</span>
+                <span>Merged: ${metrics.merged}</span>
+                <span>Open: ${metrics.open}</span>
+                <span>Closed: ${metrics.closed || 0}</span>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function changeGroup() {
+    const selector = document.getElementById('groupFilter');
+    currentGroup = selector.value || null;
+    fetchMetrics();
+}

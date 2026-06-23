@@ -17,6 +17,12 @@
 
     <div class="container">
         <div class="controls">
+            <label for="groupFilter">Group:</label>
+            <select id="groupFilter">
+                <option value="">All Groups</option>
+                <!-- Populated dynamically from /api/groups -->
+            </select>
+
             <label for="dateRange">Time Range:</label>
             <select id="dateRange">
                 <option value="7">Last 7 Days</option>
@@ -93,6 +99,13 @@
                 <div class="chart-container">
                     <canvas id="commitsByProjectChart"></canvas>
                 </div>
+            </div>
+        </div>
+
+        <div class="group-breakdown-card" id="groupBreakdownContainer" style="display: none;">
+            <h2>Metrics by Group</h2>
+            <div id="groupBreakdown" class="group-breakdown-grid">
+                <!-- Populated by JavaScript -->
             </div>
         </div>
 

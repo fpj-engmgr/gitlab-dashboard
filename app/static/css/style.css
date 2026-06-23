@@ -244,3 +244,51 @@ table tr:hover {
         width: 100%;
     }
 }
+
+/* Group breakdown styles */
+.group-breakdown-card {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+}
+
+.group-breakdown-card h2 {
+    font-size: 1.3em;
+    color: #333;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.group-breakdown-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+}
+
+.group-breakdown-item {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.group-breakdown-item h3 {
+    margin: 0 0 15px 0;
+    font-size: 1.1em;
+    border-bottom: 1px solid rgba(255,255,255,0.3);
+    padding-bottom: 10px;
+}
+
+.group-breakdown-item .mini-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.group-breakdown-item .mini-metrics span {
+    font-size: 0.95em;
+}

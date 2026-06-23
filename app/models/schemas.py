@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, UniqueConstraint
 from datetime import datetime
 from .database import Base
 
@@ -7,6 +7,7 @@ class MergeRequest(Base):
     __tablename__ = "merge_requests"
 
     id = Column(Integer, primary_key=True, index=True)
+    group_id = Column(String, index=True, nullable=True)  # Multi-group support
     project_id = Column(Integer, index=True)
     project_name = Column(String)
     iid = Column(Integer)
@@ -27,6 +28,7 @@ class Commit(Base):
     __tablename__ = "commits"
 
     id = Column(String, primary_key=True)
+    group_id = Column(String, index=True, nullable=True)  # Multi-group support
     project_id = Column(Integer, index=True)
     project_name = Column(String)
     author_name = Column(String)
@@ -41,6 +43,7 @@ class Comment(Base):
     __tablename__ = "comments"
 
     id = Column(Integer, primary_key=True, index=True)
+    group_id = Column(String, index=True, nullable=True)  # Multi-group support
     note_id = Column(Integer, unique=True)
     mr_id = Column(Integer, index=True)
     project_id = Column(Integer, index=True)
@@ -57,13 +60,18 @@ class Contributor(Base):
     __tablename__ = "contributors"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True)
+    group_id = Column(String, index=True, nullable=True)  # Multi-group support
+    username = Column(String)
     name = Column(String)
     email = Column(String)
     commit_count = Column(Integer, default=0)
     mr_count = Column(Integer, default=0)
     comment_count = Column(Integer, default=0)
     last_activity = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint('group_id', 'username', name='_group_username_uc'),
+    )
 
 
 class CacheMetadata(Base):

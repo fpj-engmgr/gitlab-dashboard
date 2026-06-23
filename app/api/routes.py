@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from typing import Optional
 from app.models import get_db
 from app.services.metrics_service import MetricsService
+from app.config import settings
 import logging
 
 router = APIRouter()
@@ -17,32 +19,58 @@ async def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
 
+@router.get("/api/groups")
+async def get_groups():
+    """Get list of configured groups."""
+    groups = settings.get_groups()
+    return {
+        "groups": groups,
+        "mode": "multi" if len(groups) > 1 else "single"
+    }
+
+
 @router.get("/api/metrics/merge-requests")
-async def get_merge_request_metrics(days: int = 30, db: Session = Depends(get_db)):
-    """Get merge request metrics."""
-    service = MetricsService(db)
-    return service.get_merge_request_metrics(days=days)
+async def get_merge_request_metrics(
+    days: int = 30,
+    group_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get merge request metrics, optionally filtered by group."""
+    service = MetricsService(db, group_id=group_id)
+    return service.get_merge_request_metrics(days=days, group_id=group_id)
 
 
 @router.get("/api/metrics/commits")
-async def get_commit_metrics(days: int = 30, db: Session = Depends(get_db)):
-    """Get commit activity metrics."""
-    service = MetricsService(db)
+async def get_commit_metrics(
+    days: int = 30,
+    group_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get commit activity metrics, optionally filtered by group."""
+    service = MetricsService(db, group_id=group_id)
     return service.get_commit_metrics(days=days)
 
 
 @router.get("/api/metrics/contributors")
-async def get_contributor_metrics(days: int = 30, db: Session = Depends(get_db)):
-    """Get contributor statistics."""
-    service = MetricsService(db)
-    return service.get_contributor_metrics(days=days)
+async def get_contributor_metrics(
+    days: int = 30,
+    group_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get contributor statistics, optionally filtered by group."""
+    service = MetricsService(db, group_id=group_id)
+    return service.get_contributor_metrics(days=days, group_id=group_id)
 
 
 @router.get("/api/metrics/comments")
-async def get_comment_metrics(days: int = 30, db: Session = Depends(get_db)):
-    """Get MR comment/review metrics."""
-    service = MetricsService(db)
-    return service.get_comment_metrics(days=days)
+async def get_comment_metrics(
+    days: int = 30,
+    group_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get MR comment/review metrics, optionally filtered by group."""
+    service = MetricsService(db, group_id=group_id)
+    return service.get_comment_metrics(days=days, group_id=group_id)
 
 
 @router.post("/api/refresh")

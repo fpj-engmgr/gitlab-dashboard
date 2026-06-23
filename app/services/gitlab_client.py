@@ -8,11 +8,12 @@ logger = logging.getLogger(__name__)
 
 
 class GitLabClient:
-    def __init__(self):
+    def __init__(self, group_path: str = None, group_id: str = None):
         self.gl = gitlab.Gitlab(settings.gitlab_url, private_token=settings.gitlab_token)
-        self.group_path = settings.gitlab_group
+        self.group_path = group_path or settings.gitlab_group
+        self.group_id = group_id or "default"
         self.team_members = settings.get_team_members()
-        logger.info(f"Initialized GitLab client for group: {self.group_path}")
+        logger.info(f"Initialized GitLab client for group: {self.group_path} (id: {self.group_id})")
         logger.info(f"Tracking {len(self.team_members)} team members: {', '.join(self.team_members)}")
 
     def get_group(self):
@@ -39,6 +40,7 @@ class GitLabClient:
             for mr in group_mrs:
                 try:
                     mr_data = {
+                        'group_id': self.group_id,  # Multi-group support
                         'project_id': mr.project_id,
                         'project_name': getattr(mr, 'references', {}).get('full', 'unknown').split('!')[0],
                         'iid': mr.iid,
@@ -103,6 +105,7 @@ class GitLabClient:
                         continue
 
                     mr_data = {
+                        'group_id': self.group_id,  # Multi-group support
                         'project_id': mr.project_id,
                         'project_name': getattr(mr, 'references', {}).get('full', 'unknown').split('!')[0],
                         'iid': mr.iid,
@@ -476,9 +479,14 @@ class GitLabClient:
 
             for mr in mrs_data:
                 author = mr['author']
+                group_id = mr.get('group_id', 'default')  # Get group_id from MR data
 
-                if author not in contributors:
-                    contributors[author] = {
+                # Create composite key: group_id + username
+                key = f"{group_id}:{author}"
+
+                if key not in contributors:
+                    contributors[key] = {
+                        'group_id': group_id,  # Multi-group support
                         'username': author,
                         'name': author,
                         'email': f"{author}@unknown",
@@ -488,11 +496,11 @@ class GitLabClient:
                         'last_activity': mr['updated_at']
                     }
 
-                contributors[author]['mr_count'] += 1
+                contributors[key]['mr_count'] += 1
 
                 # Update last activity
-                if mr['updated_at'] > contributors[author]['last_activity']:
-                    contributors[author]['last_activity'] = mr['updated_at']
+                if mr['updated_at'] > contributors[key]['last_activity']:
+                    contributors[key]['last_activity'] = mr['updated_at']
 
             logger.info(f"Phase 1 complete: {len(contributors)} contributors, {len(mrs_data)} MRs")
             return list(contributors.values())
@@ -506,9 +514,14 @@ class GitLabClient:
 
         for mr in mrs_data:
             author = mr['author']
+            group_id = mr.get('group_id', 'default')  # Get group_id from MR data
 
-            if author not in contributors:
-                contributors[author] = {
+            # Create composite key: group_id + username
+            key = f"{group_id}:{author}"
+
+            if key not in contributors:
+                contributors[key] = {
+                    'group_id': group_id,  # Multi-group support
                     'username': author,
                     'name': author,
                     'email': f"{author}@unknown",
@@ -518,10 +531,10 @@ class GitLabClient:
                     'last_activity': mr['updated_at']
                 }
 
-            contributors[author]['mr_count'] += 1
+            contributors[key]['mr_count'] += 1
 
-            if mr['updated_at'] > contributors[author]['last_activity']:
-                contributors[author]['last_activity'] = mr['updated_at']
+            if mr['updated_at'] > contributors[key]['last_activity']:
+                contributors[key]['last_activity'] = mr['updated_at']
 
             # Fetch detailed data
             try:
@@ -536,7 +549,7 @@ class GitLabClient:
                 # Count commits
                 try:
                     mr_commits = full_mr.commits.list(get_all=True)
-                    contributors[author]['commit_count'] += len(mr_commits)
+                    contributors[key]['commit_count'] += len(mr_commits)
                 except Exception as e:
                     logger.debug(f"Could not fetch commits for MR {mr['iid']}: {e}")
 
@@ -547,8 +560,10 @@ class GitLabClient:
                     for note in mr_notes:
                         note_author = note.author.get('username', 'unknown')
                         if note_author in self.team_members:
-                            if note_author not in contributors:
-                                contributors[note_author] = {
+                            note_key = f"{group_id}:{note_author}"
+                            if note_key not in contributors:
+                                contributors[note_key] = {
+                                    'group_id': group_id,
                                     'username': note_author,
                                     'name': note_author,
                                     'email': f"{note_author}@unknown",
@@ -557,14 +572,16 @@ class GitLabClient:
                                     'comment_count': 0,
                                     'last_activity': mr['updated_at']
                                 }
-                            contributors[note_author]['comment_count'] += 1
+                            contributors[note_key]['comment_count'] += 1
 
                     mr_approvals = full_mr.approvals.get()
                     for approval in mr_approvals.approved_by:
                         approval_author = approval.get('user', {}).get('username', 'unknown')
                         if approval_author in self.team_members:
-                            if approval_author not in contributors:
-                                contributors[approval_author] = {
+                            approval_key = f"{group_id}:{approval_author}"
+                            if approval_key not in contributors:
+                                contributors[approval_key] = {
+                                    'group_id': group_id,
                                     'username': approval_author,
                                     'name': approval_author,
                                     'email': f"{approval_author}@unknown",
@@ -573,7 +590,7 @@ class GitLabClient:
                                     'comment_count': 0,
                                     'last_activity': mr['updated_at']
                                 }
-                            contributors[approval_author]['comment_count'] += 1
+                            contributors[approval_key]['comment_count'] += 1
 
                 except Exception as e:
                     logger.debug(f"Could not fetch comments/approvals for MR {mr['iid']}: {e}")
