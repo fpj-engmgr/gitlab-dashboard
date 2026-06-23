@@ -82,6 +82,11 @@ class MetricsService:
 
     def refresh_commits(self, days: int = 30):
         """Refresh commits cache."""
+        # Skip for MultiGroupGitLabClient - commits derived from contributor stats in hybrid mode
+        if isinstance(self.gitlab_client, MultiGroupGitLabClient):
+            self.update_cache_metadata("commits")
+            return
+
         commits_data = self.gitlab_client.get_commits(days=days)
 
         self.db.query(Commit).delete()
@@ -95,6 +100,11 @@ class MetricsService:
 
     def refresh_comments(self, days: int = 30):
         """Refresh comments cache."""
+        # Skip for MultiGroupGitLabClient - comments derived from contributor stats in hybrid mode
+        if isinstance(self.gitlab_client, MultiGroupGitLabClient):
+            self.update_cache_metadata("comments")
+            return
+
         comments_data = self.gitlab_client.get_comments(days=days)
 
         self.db.query(Comment).delete()
