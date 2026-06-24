@@ -6,8 +6,10 @@ async function loadGroups() {
     try {
         const response = await fetch('/api/groups');
         const data = await response.json();
+        console.log('Groups data:', data);
 
         if (data.mode === 'multi') {
+            console.log('Multi-group mode, populating selector');
             populateGroupSelector(data.groups);
             document.getElementById('groupFilter').style.display = 'inline-block';
             document.querySelector('label[for="groupFilter"]').style.display = 'inline-block';
@@ -23,14 +25,17 @@ async function loadGroups() {
 
 function populateGroupSelector(groups) {
     const selector = document.getElementById('groupFilter');
+    console.log('Populating selector with groups:', groups);
     groups.forEach(group => {
         if (group.enabled) {
+            console.log('Adding group:', group.name);
             const option = document.createElement('option');
             option.value = group.id;
             option.textContent = group.name;
             selector.appendChild(option);
         }
     });
+    console.log('Selector now has', selector.options.length, 'options');
 }
 
 async function fetchMetrics() {
@@ -39,15 +44,31 @@ async function fetchMetrics() {
 
         const groupParam = currentGroup ? `&group_id=${currentGroup}` : '';
 
+        console.log('Fetching metrics with days:', currentDays, 'group:', currentGroup);
+
         const [mrData, commitData, contributorData, commentData] = await Promise.all([
-            fetch(`/api/metrics/merge-requests?days=${currentDays}${groupParam}`).then(r => r.json()),
-            fetch(`/api/metrics/commits?days=${currentDays}${groupParam}`).then(r => r.json()),
-            fetch(`/api/metrics/contributors?days=${currentDays}${groupParam}`).then(r => r.json()),
-            fetch(`/api/metrics/comments?days=${currentDays}${groupParam}`).then(r => r.json())
+            fetch(`/api/metrics/merge-requests?days=${currentDays}${groupParam}`).then(r => {
+                if (!r.ok) throw new Error(`MR endpoint failed: ${r.status}`);
+                return r.json();
+            }),
+            fetch(`/api/metrics/commits?days=${currentDays}${groupParam}`).then(r => {
+                if (!r.ok) throw new Error(`Commits endpoint failed: ${r.status}`);
+                return r.json();
+            }),
+            fetch(`/api/metrics/contributors?days=${currentDays}${groupParam}`).then(r => {
+                if (!r.ok) throw new Error(`Contributors endpoint failed: ${r.status}`);
+                return r.json();
+            }),
+            fetch(`/api/metrics/comments?days=${currentDays}${groupParam}`).then(r => {
+                if (!r.ok) throw new Error(`Comments endpoint failed: ${r.status}`);
+                return r.json();
+            })
         ]);
 
+        console.log('Data fetched successfully:', {mrData, commitData, contributorData, commentData});
+
         updateMetricCards(mrData, commitData, contributorData, commentData);
-        updateCharts(mrData, commitData, contributorData);
+        updateCharts(mrData, contributorData);
         updateTables(mrData, contributorData);
 
         // Update group breakdown if viewing all groups
@@ -61,7 +82,8 @@ async function fetchMetrics() {
         hideLoading();
     } catch (error) {
         console.error('Error fetching metrics:', error);
-        showError('Failed to load metrics. Please check your GitLab token and configuration.');
+        showError('Failed to load metrics: ' + error.message);
+        hideLoading();
     }
 }
 
@@ -89,16 +111,13 @@ function updateMetricCards(mrData, commitData, contributorData, commentData) {
     document.getElementById('merged-mrs').textContent = mrData.merged;
     document.getElementById('open-mrs').textContent = mrData.open;
     document.getElementById('avg-merge-time').textContent = mrData.avg_time_to_merge_hours.toFixed(1);
-    document.getElementById('total-commits').textContent = commitData.total;
     document.getElementById('total-contributors').textContent = contributorData.total_contributors;
     document.getElementById('total-comments').textContent = commentData.total;
 }
 
-function updateCharts(mrData, commitData, contributorData) {
+function updateCharts(mrData, contributorData) {
     updateMRStateChart(mrData);
-    updateCommitsByDayChart(commitData);
     updateTopContributorsChart(contributorData);
-    updateCommitsByProjectChart(commitData);
 }
 
 function updateMRStateChart(mrData) {
@@ -129,46 +148,6 @@ function updateMRStateChart(mrData) {
     });
 }
 
-function updateCommitsByDayChart(commitData) {
-    const ctx = document.getElementById('commitsByDayChart').getContext('2d');
-
-    if (charts.commitsByDay) {
-        charts.commitsByDay.destroy();
-    }
-
-    const sortedDays = Object.keys(commitData.by_day).sort();
-    const commitCounts = sortedDays.map(day => commitData.by_day[day]);
-
-    charts.commitsByDay = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: sortedDays,
-            datasets: [{
-                label: 'Commits per Day',
-                data: commitCounts,
-                borderColor: '#667eea',
-                backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            }
-        }
-    });
-}
-
 function updateTopContributorsChart(contributorData) {
     const ctx = document.getElementById('topContributorsChart').getContext('2d');
 
@@ -178,15 +157,15 @@ function updateTopContributorsChart(contributorData) {
 
     const topContribs = contributorData.top_contributors.slice(0, 10);
     const names = topContribs.map(c => c.name);
-    const commits = topContribs.map(c => c.commit_count);
+    const mrs = topContribs.map(c => c.mr_count);
 
     charts.topContributors = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: names,
             datasets: [{
-                label: 'Commits',
-                data: commits,
+                label: 'Merge Requests',
+                data: mrs,
                 backgroundColor: '#764ba2'
             }]
         },
@@ -208,46 +187,9 @@ function updateTopContributorsChart(contributorData) {
     });
 }
 
-function updateCommitsByProjectChart(commitData) {
-    const ctx = document.getElementById('commitsByProjectChart').getContext('2d');
-
-    if (charts.commitsByProject) {
-        charts.commitsByProject.destroy();
-    }
-
-    const projects = Object.keys(commitData.by_project);
-    const counts = Object.values(commitData.by_project);
-
-    charts.commitsByProject = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: projects,
-            datasets: [{
-                label: 'Commits',
-                data: counts,
-                backgroundColor: '#667eea'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            }
-        }
-    });
-}
-
 function updateTables(mrData, contributorData) {
     updateMRTable(mrData.merge_requests);
-    updateContributorTable(contributorData.top_contributors);
+    updateContributorTable(contributorData.all_contributors || contributorData.top_contributors);
 }
 
 function updateMRTable(mergeRequests) {
@@ -275,22 +217,87 @@ function updateMRTable(mergeRequests) {
     });
 }
 
+let allContributors = [];
+let currentSort = { column: 'mr_count', direction: 'desc' };
+
 function updateContributorTable(contributors) {
+    // Store all contributors for sorting
+    allContributors = contributors;
+
+    // Sort by current sort settings
+    sortContributors();
+
     const tbody = document.getElementById('contributorTableBody');
     tbody.innerHTML = '';
 
-    contributors.forEach(contrib => {
+    allContributors.forEach(contrib => {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${contrib.name}</td>
             <td>${contrib.username}</td>
-            <td>${contrib.commit_count}</td>
             <td>${contrib.mr_count}</td>
             <td>${contrib.comment_count}</td>
             <td>${contrib.last_activity ? new Date(contrib.last_activity).toLocaleDateString() : 'N/A'}</td>
         `;
         tbody.appendChild(row);
     });
+
+    // Update sort indicators
+    updateSortIndicators();
+}
+
+function sortContributors() {
+    const column = currentSort.column;
+    const direction = currentSort.direction;
+
+    allContributors.sort((a, b) => {
+        let aVal = a[column];
+        let bVal = b[column];
+
+        // Handle date comparison
+        if (column === 'last_activity') {
+            aVal = aVal ? new Date(aVal) : new Date(0);
+            bVal = bVal ? new Date(bVal) : new Date(0);
+        }
+
+        // Handle string comparison
+        if (typeof aVal === 'string') {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+        }
+
+        if (direction === 'asc') {
+            return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+        } else {
+            return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+        }
+    });
+}
+
+function updateSortIndicators() {
+    // Clear all sort indicators
+    document.querySelectorAll('th.sortable').forEach(th => {
+        th.removeAttribute('data-sort');
+    });
+
+    // Set current sort indicator
+    const currentHeader = document.querySelector(`th.sortable[data-column="${currentSort.column}"]`);
+    if (currentHeader) {
+        currentHeader.setAttribute('data-sort', currentSort.direction);
+    }
+}
+
+function handleSort(column) {
+    if (currentSort.column === column) {
+        // Toggle direction
+        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        // New column, default to descending
+        currentSort.column = column;
+        currentSort.direction = 'desc';
+    }
+
+    updateContributorTable(allContributors);
 }
 
 async function refreshData() {
@@ -351,7 +358,15 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchMetrics();
     document.getElementById('refreshBtn').addEventListener('click', refreshData);
     document.getElementById('dateRange').addEventListener('change', changeDateRange);
-    document.getElementById('groupFilter').addEventListener('change', changeGroup);  // New: group filter
+    document.getElementById('groupFilter').addEventListener('change', changeGroup);
+
+    // Add click handlers for sortable table headers
+    document.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const column = th.getAttribute('data-column');
+            handleSort(column);
+        });
+    });
 });
 
 function updateGroupBreakdown(groupData) {

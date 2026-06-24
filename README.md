@@ -1,22 +1,27 @@
 # GitLab Dashboard
 
-A web dashboard for monitoring GitLab metrics for your engineering team. Uses a **team-member-first approach** - you specify your team members, and the dashboard tracks their contributions across all projects in a GitLab group.
+A web dashboard for monitoring GitLab metrics for your engineering team. Uses a **team-member-first approach** - you specify your team members, and the dashboard tracks their contributions across multiple GitLab groups and projects.
 
 ## Key Benefits
 
-- **Fast & Efficient**: Queries only your team members' contributions instead of scanning all projects
+- **Multi-Group & Multi-Project Support**: Track metrics across multiple GitLab groups AND individual projects simultaneously
+- **Fast & Efficient**: Parallel fetching from multiple sources with intelligent caching
 - **Scales to Large Groups**: Works efficiently even with hundreds or thousands of projects
 - **Team-Focused**: See exactly what your team is working on, filtered from the noise
+- **Flexible Source Types**: Mix and match GitLab groups (all projects within) and individual projects
 
 ## Features
 
+- **Multi-Source Tracking**: Monitor multiple GitLab groups and individual projects in a single dashboard
+- **Group Filtering**: View metrics across all sources or filter by specific group/project
 - **Merge Request Metrics**: Track total, merged, open, and closed MRs with average time to merge
-- **Code Review Metrics**: Monitor MR review activity and trends  
-- **Commit Activity**: Visualize commits over time by project and contributor
-- **Contributor Stats**: See top contributors and their activity levels
+- **Code Review Metrics**: Monitor MR comment activity and trends  
+- **Contributor Stats**: Sortable table showing ALL team members (even with 0 contributions)
+- **Interactive Sorting**: Click column headers to sort contributors by any metric (ascending/descending)
 - **SQLite Caching**: Fast dashboard loads with automatic cache refresh
 - **Interactive Charts**: Beautiful visualizations using Chart.js
 - **Time Range Selection**: View metrics for 7, 14, 30, 60, or 90 days
+- **Per-Group Breakdown**: See metrics split by each configured source
 
 ## Tech Stack
 
@@ -52,13 +57,48 @@ A web dashboard for monitoring GitLab metrics for your engineering team. Uses a 
    ```
    GITLAB_URL=https://gitlab.com
    GITLAB_TOKEN=your_gitlab_personal_access_token_here
-   GITLAB_GROUP=redhat/rhel-ai
+   GITLAB_GROUP=redhat/rhel-ai/core  # Default group (used for single-group mode)
    DATABASE_URL=sqlite:///./gitlab_metrics.db
-   CACHE_DURATION_HOURS=1
+   CACHE_DURATION_HOURS=6
    TEAM_MEMBERS_FILE=team_members.json
    ```
 
-6. **Configure team members (REQUIRED)**:
+6. **Configure multi-group/multi-project tracking (OPTIONAL)**:
+   ```bash
+   cp groups.json.example groups.json
+   ```
+   
+   Edit `groups.json` to track multiple groups and/or individual projects:
+   ```json
+   {
+     "groups": [
+       {
+         "id": "base-images",
+         "name": "Base Images",
+         "path": "redhat/rhel-ai/core/base-images",
+         "type": "group",
+         "description": "Red Hat AI Base Images",
+         "enabled": true
+       },
+       {
+         "id": "team-docs",
+         "name": "Team Documentation",
+         "path": "redhat/rhel-ai/core/team-docs",
+         "type": "project",
+         "description": "Documentation project",
+         "enabled": true
+       }
+     ]
+   }
+   ```
+   
+   **Source Types:**
+   - `"type": "group"` - Fetches MRs from ALL projects within the group
+   - `"type": "project"` - Fetches MRs from a single specific project
+   
+   **Note:** If `groups.json` doesn't exist, the dashboard uses single-group mode with `GITLAB_GROUP` from `.env`.
+
+7. **Configure team members (REQUIRED)**:
    ```bash
    cp team_members.json.example team_members.json
    ```
@@ -102,9 +142,10 @@ The dashboard will automatically fetch and cache data from GitLab on first load.
 ## API Endpoints
 
 - `GET /` - Main dashboard page
-- `GET /api/metrics/merge-requests?days=30` - Get MR metrics
-- `GET /api/metrics/commits?days=30` - Get commit metrics
-- `GET /api/metrics/contributors?days=30` - Get contributor stats
+- `GET /api/groups` - Get list of configured groups/projects
+- `GET /api/metrics/merge-requests?days=30&group_id=<id>` - Get MR metrics (optionally filtered by group)
+- `GET /api/metrics/contributors?days=30&group_id=<id>` - Get contributor stats (all team members, sortable)
+- `GET /api/metrics/comments?days=30&group_id=<id>` - Get MR comment metrics
 - `POST /api/refresh?days=30` - Force refresh all metrics from GitLab
 - `GET /health` - Health check endpoint
 
@@ -149,20 +190,22 @@ The dashboard uses a **team-member-first approach**. You must create a `team_mem
 
 The dashboard is highly optimized for large GitLab groups:
 
-**Single-Pass Data Fetching**:
-- MRs: 1 API call to fetch all group MRs, then filter client-side
-- Comments: 1 pass through all MRs, scanning notes once
-- Commits: User events API with server-side date filtering (`after` parameter)
+**Parallel Multi-Source Fetching**:
+- Multiple groups/projects fetched in parallel (up to 5 concurrent workers)
+- MRs: 1 API call per source to fetch all MRs, then filter to team members
+- Comments: Derived from MR data (no separate API calls)
+- Commits: Derived from contributor stats (hybrid approach)
 
 **Intelligent Caching**:
 - Project cache: Projects fetched once and reused across API calls
 - User cache: User objects cached to avoid repeated lookups
 - Database cache: All data cached in SQLite for `CACHE_DURATION_HOURS`
+- Per-group storage: Contributors tracked with composite key (group_id + username)
 
 **Result**: 
-- First load: ~30-60 seconds (depends on group size and team size)
+- First load with 4 sources: ~10-15 seconds (parallel fetching)
 - Subsequent loads (within cache window): <1 second (served from database)
-- For 841 projects + 25 team members: went from 25+ API calls per metric to 1-2 calls total
+- For multiple groups with 100+ projects total + 25 team members: efficient parallel processing
 
 ## Project Structure
 
@@ -171,26 +214,31 @@ gitlab-dashboard/
 ├── app/
 │   ├── api/
 │   │   ├── __init__.py
-│   │   └── routes.py          # API endpoints
+│   │   └── routes.py              # API endpoints
 │   ├── models/
 │   │   ├── __init__.py
-│   │   ├── database.py        # Database setup
-│   │   └── schemas.py         # SQLAlchemy models
+│   │   ├── database.py            # Database setup
+│   │   └── schemas.py             # SQLAlchemy models (with multi-group support)
 │   ├── services/
 │   │   ├── __init__.py
-│   │   ├── gitlab_client.py   # GitLab API client
-│   │   └── metrics_service.py # Metrics calculation
+│   │   ├── gitlab_client.py       # GitLab API client (group & project support)
+│   │   ├── multi_group_client.py  # Parallel multi-source orchestrator
+│   │   └── metrics_service.py     # Metrics calculation with group filtering
 │   ├── static/
 │   │   ├── css/
-│   │   │   └── style.css      # Dashboard styles
+│   │   │   └── style.css          # Dashboard styles (sortable table styles)
 │   │   └── js/
-│   │       └── dashboard.js   # Frontend logic
+│   │       └── dashboard.js       # Frontend logic (sorting, filtering)
 │   ├── templates/
-│   │   └── dashboard.html     # Main dashboard template
-│   ├── config.py              # Configuration management
-│   └── main.py                # FastAPI application
+│   │   └── dashboard.html         # Main dashboard template
+│   ├── config.py                  # Configuration management
+│   └── main.py                    # FastAPI application
+├── scripts/
+│   └── migrate_add_groups.py     # Database migration for multi-group support
 ├── .env.example
 ├── .gitignore
+├── groups.json.example            # Multi-group configuration example
+├── team_members.json.example
 ├── requirements.txt
 └── README.md
 ```

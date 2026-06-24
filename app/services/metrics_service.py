@@ -14,18 +14,28 @@ class MetricsService:
 
         # Use multi-group client if no specific group requested
         groups = settings.get_groups()
+        enabled_groups = [g for g in groups if g.get('enabled', True)]
+
         if group_id:
             # Single-group mode: find the specific group config
             group_config = next((g for g in groups if g['id'] == group_id), None)
             if group_config:
-                self.gitlab_client = GitLabClient(group_path=group_config['path'], group_id=group_id)
+                self.gitlab_client = GitLabClient(
+                    group_path=group_config['path'],
+                    group_id=group_id,
+                    source_type=group_config.get('type', 'group')
+                )
             else:
                 # Fallback to default
                 self.gitlab_client = GitLabClient(group_id=group_id)
-        elif len(groups) == 1:
+        elif len(enabled_groups) == 1:
             # Single-group mode (backward compatibility)
-            group = groups[0]
-            self.gitlab_client = GitLabClient(group_path=group['path'], group_id=group['id'])
+            group = enabled_groups[0]
+            self.gitlab_client = GitLabClient(
+                group_path=group['path'],
+                group_id=group['id'],
+                source_type=group.get('type', 'group')
+            )
         else:
             # Multi-group mode
             self.gitlab_client = MultiGroupGitLabClient()
@@ -291,7 +301,38 @@ class MetricsService:
         total_mrs = sum(c.mr_count for c in contributors)
         total_comments = sum(c.comment_count for c in contributors)
 
-        top_contributors = sorted(contributors, key=lambda c: c.commit_count, reverse=True)[:10]
+        # Create a map of existing contributors by username
+        contributor_map = {c.username: c for c in contributors}
+
+        # Return ALL team members, including those with 0 contributions
+        team_members = settings.get_team_members()
+        all_contributors = []
+
+        for username in team_members:
+            if username in contributor_map:
+                # Existing contributor with data
+                c = contributor_map[username]
+                all_contributors.append({
+                    "name": c.name,
+                    "username": c.username,
+                    "commit_count": c.commit_count,
+                    "mr_count": c.mr_count,
+                    "comment_count": c.comment_count,
+                    "last_activity": c.last_activity.isoformat() if c.last_activity else None,
+                })
+            else:
+                # Team member with no activity
+                all_contributors.append({
+                    "name": username,
+                    "username": username,
+                    "commit_count": 0,
+                    "mr_count": 0,
+                    "comment_count": 0,
+                    "last_activity": None,
+                })
+
+        # Keep top_contributors for the chart (top 10 by MRs)
+        top_10_for_chart = sorted(contributors, key=lambda c: c.mr_count, reverse=True)[:10]
 
         return {
             "total_contributors": total_contributors,
@@ -307,6 +348,7 @@ class MetricsService:
                     "comment_count": c.comment_count,
                     "last_activity": c.last_activity.isoformat() if c.last_activity else None,
                 }
-                for c in top_contributors
-            ]
+                for c in top_10_for_chart
+            ],
+            "all_contributors": all_contributors
         }

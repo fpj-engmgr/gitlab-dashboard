@@ -8,17 +8,26 @@ logger = logging.getLogger(__name__)
 
 
 class GitLabClient:
-    def __init__(self, group_path: str = None, group_id: str = None):
+    def __init__(self, group_path: str = None, group_id: str = None, source_type: str = "group"):
         self.gl = gitlab.Gitlab(settings.gitlab_url, private_token=settings.gitlab_token)
         self.group_path = group_path or settings.gitlab_group
         self.group_id = group_id or "default"
+        self.source_type = source_type  # "group" or "project"
         self.team_members = settings.get_team_members()
-        logger.info(f"Initialized GitLab client for group: {self.group_path} (id: {self.group_id})")
+
+        if self.source_type == "project":
+            logger.info(f"Initialized GitLab client for project: {self.group_path} (id: {self.group_id})")
+        else:
+            logger.info(f"Initialized GitLab client for group: {self.group_path} (id: {self.group_id})")
         logger.info(f"Tracking {len(self.team_members)} team members: {', '.join(self.team_members)}")
 
     def get_group(self):
         """Get the GitLab group."""
         return self.gl.groups.get(self.group_path)
+
+    def get_project(self):
+        """Get the GitLab project."""
+        return self.gl.projects.get(self.group_path)
 
     def get_merge_requests_for_member(self, username: str, days: int = 30) -> List[Dict[str, Any]]:
         """Fetch merge requests authored by a specific team member."""
@@ -84,19 +93,27 @@ class GitLabClient:
         team_members_set = set(self.team_members)
 
         try:
-            group = self.get_group()
+            if self.source_type == "project":
+                # Fetch MRs from a single project
+                project = self.get_project()
+                logger.info(f"Fetching all MRs from project {self.group_path} (single pass)")
+                source_mrs = project.mergerequests.list(
+                    updated_after=since.isoformat(),
+                    get_all=True
+                )
+            else:
+                # Fetch MRs from all projects in a group
+                group = self.get_group()
+                logger.info(f"Fetching all MRs from group {self.group_path} (single pass)")
+                source_mrs = group.mergerequests.list(
+                    updated_after=since.isoformat(),
+                    get_all=True
+                )
 
-            # Single API call to get ALL MRs in the group
-            logger.info(f"Fetching all MRs from group {self.group_path} (single pass)")
-            group_mrs = group.mergerequests.list(
-                updated_after=since.isoformat(),
-                get_all=True
-            )
-
-            logger.info(f"Fetched {len(group_mrs)} total MRs, filtering to team members")
+            logger.info(f"Fetched {len(source_mrs)} total MRs, filtering to team members")
 
             # Filter to team members
-            for mr in group_mrs:
+            for mr in source_mrs:
                 try:
                     author = mr.author.get('username', 'unknown')
 

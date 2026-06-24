@@ -17,10 +17,14 @@ class MultiGroupGitLabClient:
     def __init__(self):
         self.groups = settings.get_groups()
         self.clients = {
-            group['id']: GitLabClient(group_path=group['path'], group_id=group['id'])
+            group['id']: GitLabClient(
+                group_path=group['path'],
+                group_id=group['id'],
+                source_type=group.get('type', 'group')  # Support both "group" and "project" types
+            )
             for group in self.groups if group.get('enabled', True)
         }
-        logger.info(f"Initialized multi-group client with {len(self.clients)} groups")
+        logger.info(f"Initialized multi-group client with {len(self.clients)} sources (groups/projects)")
 
     def get_all_merge_requests(self, days: int = 30) -> List[Dict[str, Any]]:
         """Fetch MRs from all groups in parallel."""

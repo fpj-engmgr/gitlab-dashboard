@@ -1,18 +1,36 @@
 {
   "groups": [
     {
-      "id": "rhel-ai-core",
-      "name": "RHEL AI Core",
-      "path": "redhat/rhel-ai/core",
-      "description": "RHEL AI Core group",
+      "id": "base-images",
+      "name": "Base Images",
+      "path": "redhat/rhel-ai/core/base-images",
+      "type": "group",
+      "description": "Red Hat AI Base Images",
       "enabled": true
     },
     {
-      "id": "aipcc-docs",
-      "name": "AIPCC Documentation",
-      "path": "redhat/rhel-ai/core/team/docs",
+      "id": "tools",
+      "name": "Tools",
+      "path": "redhat/rhel-ai/core/tools",
+      "type": "group",
+      "description": "RHEL AI Tools",
+      "enabled": true
+    },
+    {
+      "id": "package-onboarding",
+      "name": "Package Onboarding",
+      "path": "redhat/rhel-ai/core/package-onboarding",
+      "type": "project",
+      "description": "AIPCC Package Onboarding tooling",
+      "enabled": true
+    },
+    {
+      "id": "team-docs",
+      "name": "AIPCC Team Documentation",
+      "path": "redhat/rhel-ai/core/team-docs",
+      "type": "project",
       "description": "AIPCC documentation and guides",
-      "enabled": false
+      "enabled": true
     }
   ]
 }
