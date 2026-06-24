@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class Settings(BaseSettings):
     gitlab_url: str = "https://gitlab.com"
     gitlab_token: str
-    gitlab_group: str = "redhat/rhel-ai"
+    gitlab_group: str = "yourorg/yourgroup"
     database_url: str = "sqlite:///./gitlab_metrics.db"
     cache_duration_hours: int = 6
     team_members_file: str = "team_members.json"

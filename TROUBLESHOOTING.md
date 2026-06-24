@@ -19,7 +19,7 @@ Your personal access token needs the correct scopes:
 The 403 errors occur when your GitLab account doesn't have access to certain projects within the group tree.
 
 **Check your access:**
-1. Go to https://gitlab.com/redhat/rhel-ai
+1. Go to https://gitlab.com/yourorg/group
 2. Browse the subgroups and projects
 3. Verify you can see all the projects listed
 4. If you can't see a project, you don't have access to it
@@ -50,7 +50,7 @@ If you want to reduce noise, you can configure the dashboard to only query speci
 If all your team's projects are in a specific subgroup:
 ```bash
 # In .env
-GITLAB_GROUP=redhat/rhel-ai/your-subgroup
+GITLAB_GROUP=yourorg/yourgroup/your-subgroup
 ```
 
 **Option B: Accept the 403s**
@@ -78,7 +78,7 @@ cat .env
 Verify:
 - `GITLAB_URL=https://gitlab.com` (or your self-hosted instance)
 - `GITLAB_TOKEN` is set to a valid token
-- `GITLAB_GROUP=redhat/rhel-ai` (or your specific group)
+- `GITLAB_GROUP=yourorg/yourgroup` (or your specific group)
 
 ### 7. Test Your Token
 
@@ -86,7 +86,7 @@ You can test your GitLab token manually:
 
 ```bash
 # Replace YOUR_TOKEN with your actual token
-curl --header "PRIVATE-TOKEN: YOUR_TOKEN" "https://gitlab.com/api/v4/groups/redhat%2Frhel-ai"
+curl --header "PRIVATE-TOKEN: YOUR_TOKEN" "https://gitlab.com/api/v4/groups/yourorg%2Fyourgroup"
 ```
 
 Expected responses:

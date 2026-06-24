@@ -11,6 +11,7 @@ ENV/
 *.sqlite3
 .env
 team_members.json
+groups.json
 .DS_Store
 .idea/
 .vscode/

@@ -57,7 +57,7 @@ A web dashboard for monitoring GitLab metrics for your engineering team. Uses a 
    ```
    GITLAB_URL=https://gitlab.com
    GITLAB_TOKEN=your_gitlab_personal_access_token_here
-   GITLAB_GROUP=redhat/rhel-ai/core  # Default group (used for single-group mode)
+   GITLAB_GROUP=yourorg/yourgroup  # Default group (used for single-group mode)
    DATABASE_URL=sqlite:///./gitlab_metrics.db
    CACHE_DURATION_HOURS=6
    TEAM_MEMBERS_FILE=team_members.json
@@ -75,15 +75,15 @@ A web dashboard for monitoring GitLab metrics for your engineering team. Uses a 
        {
          "id": "base-images",
          "name": "Base Images",
-         "path": "redhat/rhel-ai/core/base-images",
+         "path": "yourorg/yourgroup/base-images",
          "type": "group",
-         "description": "Red Hat AI Base Images",
+         "description": "Base container images",
          "enabled": true
        },
        {
          "id": "team-docs",
          "name": "Team Documentation",
-         "path": "redhat/rhel-ai/core/team-docs",
+         "path": "yourorg/yourgroup/team-docs",
          "type": "project",
          "description": "Documentation project",
          "enabled": true
