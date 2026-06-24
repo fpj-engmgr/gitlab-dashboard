@@ -1,24 +1,27 @@
 {
   "groups": [
     {
-      "id": "rhel-ai",
-      "name": "RHEL AI",
-      "path": "redhat/rhel-ai/rhai",
-      "description": "RHEL AI main group",
+      "id": "base-images",
+      "name": "Base Images",
+      "path": "yourorg/your-group/base-images",
+      "type": "group",
+      "description": "Base container images group",
       "enabled": true
     },
     {
-      "id": "rhel-ai-infra",
-      "name": "RHEL AI Infrastructure",
-      "path": "redhat/rhel-ai/infrastructure",
+      "id": "team-docs",
+      "name": "Team Documentation",
+      "path": "yourorg/your-group/team-docs",
+      "type": "project",
+      "description": "Documentation project",
+      "enabled": true
+    },
+    {
+      "id": "infrastructure",
+      "name": "Infrastructure",
+      "path": "yourorg/your-group/infrastructure",
+      "type": "group",
       "description": "Infrastructure and tooling",
-      "enabled": true
-    },
-    {
-      "id": "rhel-ai-docs",
-      "name": "RHEL AI Documentation",
-      "path": "redhat/rhel-ai/documentation",
-      "description": "Documentation and guides",
       "enabled": false
     }
   ]
