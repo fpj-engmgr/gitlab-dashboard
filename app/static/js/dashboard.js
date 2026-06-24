@@ -117,7 +117,8 @@ function updateMetricCards(mrData, commitData, contributorData, commentData) {
 
 function updateCharts(mrData, contributorData) {
     updateMRStateChart(mrData);
-    updateTopContributorsChart(contributorData);
+    updateTopContributorsMRChart(contributorData);
+    updateTopContributorsCommentsChart(contributorData);
 }
 
 function updateMRStateChart(mrData) {
@@ -148,24 +149,69 @@ function updateMRStateChart(mrData) {
     });
 }
 
-function updateTopContributorsChart(contributorData) {
-    const ctx = document.getElementById('topContributorsChart').getContext('2d');
+function updateTopContributorsMRChart(contributorData) {
+    const ctx = document.getElementById('topContributorsMRChart').getContext('2d');
 
-    if (charts.topContributors) {
-        charts.topContributors.destroy();
+    if (charts.topContributorsMR) {
+        charts.topContributorsMR.destroy();
     }
 
     const topContribs = contributorData.top_contributors.slice(0, 10);
     const names = topContribs.map(c => c.name);
     const mrs = topContribs.map(c => c.mr_count);
 
-    charts.topContributors = new Chart(ctx, {
+    charts.topContributorsMR = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: names,
             datasets: [{
                 label: 'Merge Requests',
                 data: mrs,
+                backgroundColor: '#667eea'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+function updateTopContributorsCommentsChart(contributorData) {
+    const ctx = document.getElementById('topContributorsCommentsChart').getContext('2d');
+
+    if (charts.topContributorsComments) {
+        charts.topContributorsComments.destroy();
+    }
+
+    // Sort by comment count and get top 10
+    const allContribs = contributorData.all_contributors || contributorData.top_contributors;
+    const sortedByComments = allContribs
+        .filter(c => c.comment_count > 0)
+        .sort((a, b) => b.comment_count - a.comment_count)
+        .slice(0, 10);
+
+    const names = sortedByComments.map(c => c.name);
+    const comments = sortedByComments.map(c => c.comment_count);
+
+    charts.topContributorsComments = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: names,
+            datasets: [{
+                label: 'Comments',
+                data: comments,
                 backgroundColor: '#764ba2'
             }]
         },

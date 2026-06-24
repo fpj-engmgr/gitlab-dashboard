@@ -69,23 +69,32 @@
 
         <div class="charts-grid">
             <div class="chart-card">
-                <h2>Merge Request Status</h2>
+                <h2>Top Contributors (by MRs)</h2>
                 <div class="chart-container">
-                    <canvas id="mrStateChart"></canvas>
+                    <canvas id="topContributorsMRChart"></canvas>
                 </div>
             </div>
             <div class="chart-card">
-                <h2>Top Contributors (by MRs)</h2>
+                <h2>Top Contributors (by Comments)</h2>
                 <div class="chart-container">
-                    <canvas id="topContributorsChart"></canvas>
+                    <canvas id="topContributorsCommentsChart"></canvas>
                 </div>
             </div>
         </div>
 
-        <div class="group-breakdown-card" id="groupBreakdownContainer" style="display: none;">
+        <div class="group-breakdown-card compact" id="groupBreakdownContainer" style="display: none;">
             <h2>Metrics by Group</h2>
-            <div id="groupBreakdown" class="group-breakdown-grid">
+            <div id="groupBreakdown" class="group-breakdown-grid compact">
                 <!-- Populated by JavaScript -->
+            </div>
+        </div>
+
+        <div class="charts-grid single-chart">
+            <div class="chart-card">
+                <h2>Merge Request Status</h2>
+                <div class="chart-container small">
+                    <canvas id="mrStateChart"></canvas>
+                </div>
             </div>
         </div>
 

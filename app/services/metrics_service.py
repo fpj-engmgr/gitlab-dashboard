@@ -296,13 +296,40 @@ class MetricsService:
 
         contributors = query.all()
 
-        total_contributors = len(contributors)
-        total_commits = sum(c.commit_count for c in contributors)
-        total_mrs = sum(c.mr_count for c in contributors)
-        total_comments = sum(c.comment_count for c in contributors)
+        # Aggregate contributors by username (sum across all groups)
+        from collections import defaultdict
+        aggregated = defaultdict(lambda: {
+            "name": None,
+            "username": None,
+            "commit_count": 0,
+            "mr_count": 0,
+            "comment_count": 0,
+            "last_activity": None
+        })
 
-        # Create a map of existing contributors by username
-        contributor_map = {c.username: c for c in contributors}
+        for c in contributors:
+            agg = aggregated[c.username]
+            if agg["name"] is None:
+                agg["name"] = c.name
+                agg["username"] = c.username
+            agg["commit_count"] += c.commit_count
+            agg["mr_count"] += c.mr_count
+            agg["comment_count"] += c.comment_count
+            # Keep the most recent activity
+            if c.last_activity:
+                if agg["last_activity"] is None or c.last_activity > agg["last_activity"]:
+                    agg["last_activity"] = c.last_activity
+
+        # Convert to list
+        aggregated_contributors = list(aggregated.values())
+
+        total_contributors = len(aggregated_contributors)
+        total_commits = sum(c["commit_count"] for c in aggregated_contributors)
+        total_mrs = sum(c["mr_count"] for c in aggregated_contributors)
+        total_comments = sum(c["comment_count"] for c in aggregated_contributors)
+
+        # Create a map by username for lookup
+        contributor_map = {c["username"]: c for c in aggregated_contributors}
 
         # Return ALL team members, including those with 0 contributions
         team_members = settings.get_team_members()
@@ -313,12 +340,12 @@ class MetricsService:
                 # Existing contributor with data
                 c = contributor_map[username]
                 all_contributors.append({
-                    "name": c.name,
-                    "username": c.username,
-                    "commit_count": c.commit_count,
-                    "mr_count": c.mr_count,
-                    "comment_count": c.comment_count,
-                    "last_activity": c.last_activity.isoformat() if c.last_activity else None,
+                    "name": c["name"],
+                    "username": c["username"],
+                    "commit_count": c["commit_count"],
+                    "mr_count": c["mr_count"],
+                    "comment_count": c["comment_count"],
+                    "last_activity": c["last_activity"].isoformat() if c["last_activity"] else None,
                 })
             else:
                 # Team member with no activity
@@ -331,8 +358,8 @@ class MetricsService:
                     "last_activity": None,
                 })
 
-        # Keep top_contributors for the chart (top 10 by MRs)
-        top_10_for_chart = sorted(contributors, key=lambda c: c.mr_count, reverse=True)[:10]
+        # Keep top_contributors for the chart (top 10 by MRs) - use aggregated data
+        top_10_for_chart = sorted(aggregated_contributors, key=lambda c: c["mr_count"], reverse=True)[:10]
 
         return {
             "total_contributors": total_contributors,
@@ -341,12 +368,12 @@ class MetricsService:
             "total_comments": total_comments,
             "top_contributors": [
                 {
-                    "name": c.name,
-                    "username": c.username,
-                    "commit_count": c.commit_count,
-                    "mr_count": c.mr_count,
-                    "comment_count": c.comment_count,
-                    "last_activity": c.last_activity.isoformat() if c.last_activity else None,
+                    "name": c["name"],
+                    "username": c["username"],
+                    "commit_count": c["commit_count"],
+                    "mr_count": c["mr_count"],
+                    "comment_count": c["comment_count"],
+                    "last_activity": c["last_activity"].isoformat() if c["last_activity"] else None,
                 }
                 for c in top_10_for_chart
             ],

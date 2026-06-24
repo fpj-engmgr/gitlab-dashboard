@@ -134,6 +134,11 @@ header p {
     margin-bottom: 30px;
 }
 
+.charts-grid.single-chart {
+    grid-template-columns: 1fr;
+    max-width: 600px;
+}
+
 .chart-card {
     background: white;
     padding: 25px;
@@ -152,6 +157,10 @@ header p {
 .chart-container {
     position: relative;
     height: 300px;
+}
+
+.chart-container.small {
+    height: 200px;
 }
 
 .table-card {
@@ -262,6 +271,11 @@ a:hover {
     margin-bottom: 30px;
 }
 
+.group-breakdown-card.compact {
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
 .group-breakdown-card h2 {
     font-size: 1.3em;
     color: #333;
@@ -270,10 +284,21 @@ a:hover {
     padding-bottom: 10px;
 }
 
+.group-breakdown-card.compact h2 {
+    font-size: 1.1em;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+}
+
 .group-breakdown-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 15px;
+}
+
+.group-breakdown-grid.compact {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
 }
 
 .group-breakdown-item {
@@ -284,6 +309,10 @@ a:hover {
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 
+.group-breakdown-grid.compact .group-breakdown-item {
+    padding: 12px;
+}
+
 .group-breakdown-item h3 {
     margin: 0 0 15px 0;
     font-size: 1.1em;
@@ -291,10 +320,20 @@ a:hover {
     padding-bottom: 10px;
 }
 
+.group-breakdown-grid.compact .group-breakdown-item h3 {
+    margin: 0 0 8px 0;
+    font-size: 0.95em;
+    padding-bottom: 6px;
+}
+
 .group-breakdown-item .mini-metrics {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+.group-breakdown-grid.compact .group-breakdown-item .mini-metrics {
+    gap: 4px;
 }
 
 .group-breakdown-item .mini-metrics span {
