@@ -459,6 +459,118 @@ class MetricsService:
             "recent_comments": []  # Not available in hybrid mode (would be too slow)
         }
 
+    def _get_contributor_metrics_from_mrs(
+        self,
+        days: int = 30,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        group_id: Optional[str] = None
+    ):
+        """Calculate contributor metrics dynamically from filtered MRs (for custom date ranges)."""
+        from datetime import datetime
+        from collections import defaultdict
+
+        # Get filtered MRs for the date range
+        query = self.db.query(MergeRequest)
+
+        if group_id or self.group_id:
+            filter_group = group_id or self.group_id
+            query = query.filter(MergeRequest.group_id == filter_group)
+
+        # Apply date range filter
+        if start_date and end_date:
+            start_dt = datetime.fromisoformat(start_date)
+            end_dt = datetime.fromisoformat(end_date)
+            query = query.filter(
+                MergeRequest.created_at >= start_dt,
+                MergeRequest.created_at <= end_dt
+            )
+        else:
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            query = query.filter(MergeRequest.created_at >= cutoff_date)
+
+        mrs = query.all()
+
+        # Calculate contributor stats from filtered MRs
+        contributor_stats = defaultdict(lambda: {
+            "name": None,
+            "username": None,
+            "mr_count": 0,
+            "commit_count": 0,  # We don't have per-MR commit counts
+            "comment_count": 0,  # We don't have per-MR comment counts
+            "last_activity": None
+        })
+
+        for mr in mrs:
+            author = mr.author
+            stats = contributor_stats[author]
+            if stats["name"] is None:
+                stats["name"] = author  # Use username as name if not available
+                stats["username"] = author
+            stats["mr_count"] += 1
+
+            # Track most recent activity
+            if mr.created_at:
+                if stats["last_activity"] is None or mr.created_at > stats["last_activity"]:
+                    stats["last_activity"] = mr.created_at
+
+        # Convert to list
+        aggregated_contributors = list(contributor_stats.values())
+
+        total_contributors = len(aggregated_contributors)
+        total_mrs = sum(c["mr_count"] for c in aggregated_contributors)
+
+        # Create a map by username for lookup
+        contributor_map = {c["username"]: c for c in aggregated_contributors}
+
+        # Return ALL team members, including those with 0 contributions
+        team_members = settings.get_team_members()
+        all_contributors = []
+
+        for username in team_members:
+            if username in contributor_map:
+                c = contributor_map[username]
+                all_contributors.append({
+                    "name": c["name"],
+                    "username": c["username"],
+                    "commit_count": 0,  # Not available for date-filtered view
+                    "mr_count": c["mr_count"],
+                    "comment_count": 0,  # Not available for date-filtered view
+                    "last_activity": c["last_activity"].isoformat() if c["last_activity"] else None,
+                })
+            else:
+                # Team member with no activity in this date range
+                all_contributors.append({
+                    "name": username,
+                    "username": username,
+                    "commit_count": 0,
+                    "mr_count": 0,
+                    "comment_count": 0,
+                    "last_activity": None,
+                })
+
+        # Top contributors for chart (top 10 by MRs)
+        top_10 = sorted(aggregated_contributors, key=lambda c: c["mr_count"], reverse=True)[:10]
+
+        return {
+            "total_contributors": total_contributors,
+            "total_commits": 0,  # Not available for date-filtered view
+            "total_mrs": total_mrs,
+            "total_comments": 0,  # Not available for date-filtered view
+            "top_contributors": [
+                {
+                    "name": c["name"],
+                    "username": c["username"],
+                    "commit_count": 0,
+                    "mr_count": c["mr_count"],
+                    "comment_count": 0,
+                    "last_activity": c["last_activity"].isoformat() if c["last_activity"] else None,
+                }
+                for c in top_10
+            ],
+            "all_contributors": all_contributors
+        }
+
     def get_contributor_metrics(
         self,
         days: int = 30,
@@ -466,17 +578,17 @@ class MetricsService:
         end_date: Optional[str] = None,
         group_id: Optional[str] = None
     ):
-        """Get contributor metrics, optionally filtered by group."""
-        if self.should_refresh_cache("contributors"):
-            self.refresh_contributors(days=days)
+        """Get contributor metrics, optionally filtered by group or custom date range."""
+        from datetime import datetime
 
-        # Build query with optional group filter
-        query = self.db.query(Contributor)
-        if group_id or self.group_id:
-            filter_group = group_id or self.group_id
-            query = query.filter(Contributor.group_id == filter_group)
-
-        contributors = query.all()
+        # Always calculate stats from filtered MRs for accurate date-based filtering
+        # (Contributor table only has aggregated totals, not per-period breakdowns)
+        return self._get_contributor_metrics_from_mrs(
+            days=days,
+            start_date=start_date,
+            end_date=end_date,
+            group_id=group_id
+        )
 
         # Aggregate contributors by username (sum across all groups)
         from collections import defaultdict
