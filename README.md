@@ -189,9 +189,18 @@ The dashboard supports flexible date range selection including presets (This Mon
 
 1. **Select your date range** (e.g., "Last Quarter" for Q1 2026)
 2. **Click "Refresh Data" button** (if the period is older than cached data)
-3. **Wait for Phase 1** to complete (~30 seconds)
-4. **Phase 2 runs in background** (detailed comment counts, takes several minutes)
-5. **View your metrics** for the selected period
+3. **Wait for Phase 1** to complete (~30 seconds - fetches MRs, commits, basic counts)
+4. **Button returns to "Refresh Data"** - Phase 1 is done, metrics are now visible
+5. **Phase 2 continues in background** (fetches detailed comment data, takes 5-10+ minutes depending on data volume)
+6. **Comment counts update automatically** when Phase 2 completes
+
+**⚠️ Important:** When the "Refresh Data" button resets, **Phase 1 is complete** but **Phase 2 is still running**. You'll see:
+- ✅ Total MRs, Merged, Open counts (available immediately)
+- ✅ Contributor MR counts (available immediately)  
+- ⏳ Comment counts may be 0 or outdated until Phase 2 completes
+- ⏳ "Top Contributors by Comments" chart updates when Phase 2 finishes
+
+**You can continue using the dashboard** while Phase 2 runs in the background. The comment-related metrics will automatically refresh when Phase 2 completes.
 
 **Example:**
 - Today is June 25, 2026
