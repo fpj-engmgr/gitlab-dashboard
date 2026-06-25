@@ -190,6 +190,13 @@ class MetricsService:
             if not oldest_mr or oldest_mr.created_at > start_dt:
                 # Cache doesn't go back far enough, force refresh
                 need_refresh = True
+                print(f"Cache refresh needed: oldest_mr={oldest_mr.created_at if oldest_mr else 'None'}, requested start={start_dt}")
+
+            # Also check if we're requesting more days back than last refresh
+            # (e.g., previously fetched 30 days, now requesting 175 days)
+            if days_from_start > days:
+                need_refresh = True
+                print(f"Cache refresh needed: requesting {days_from_start} days back, parameter was {days}")
 
         if need_refresh:
             self.refresh_merge_requests(days=refresh_days)
