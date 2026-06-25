@@ -375,40 +375,97 @@ function updateMRTable(mergeRequests) {
     });
 }
 
+let allStaleMRs = [];
+let currentStaleMRSort = { column: 'days_open', direction: 'desc' };
+
 function updateStaleMRsTable(mergeRequests, staleThreshold = 7) {
     const tbody = document.getElementById('staleMRsTableBody');
     const tableCard = document.getElementById('staleMRsTableCard');
     tbody.innerHTML = '';
 
     // Filter for stale MRs (open and older than threshold)
-    const staleMRs = mergeRequests
+    allStaleMRs = mergeRequests
         .filter(mr => {
             const createdDate = new Date(mr.created_at);
             const ageInDays = (new Date() - createdDate) / (1000 * 60 * 60 * 24);
             return mr.state === 'opened' && ageInDays > staleThreshold;
         })
-        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); // Oldest first
+        .map(mr => {
+            const createdDate = new Date(mr.created_at);
+            const daysOpen = Math.floor((new Date() - createdDate) / (1000 * 60 * 60 * 24));
+            return {
+                ...mr,
+                daysOpen: daysOpen,
+                createdDate: createdDate
+            };
+        });
 
     // Show/hide table based on whether there are stale MRs
-    if (staleMRs.length === 0) {
+    if (allStaleMRs.length === 0) {
         tableCard.style.display = 'none';
         return;
     }
     tableCard.style.display = 'block';
 
-    staleMRs.forEach(mr => {
+    // Sort by current sort settings
+    sortStaleMRs();
+}
+
+function sortStaleMRs() {
+    const { column, direction } = currentStaleMRSort;
+
+    allStaleMRs.sort((a, b) => {
+        let valA, valB;
+
+        switch(column) {
+            case 'title':
+                valA = a.title.toLowerCase();
+                valB = b.title.toLowerCase();
+                break;
+            case 'project':
+                valA = a.project_name.toLowerCase();
+                valB = b.project_name.toLowerCase();
+                break;
+            case 'author':
+                valA = a.author.toLowerCase();
+                valB = b.author.toLowerCase();
+                break;
+            case 'days_open':
+                valA = a.daysOpen;
+                valB = b.daysOpen;
+                break;
+            case 'created':
+                valA = a.createdDate;
+                valB = b.createdDate;
+                break;
+            default:
+                return 0;
+        }
+
+        if (valA < valB) return direction === 'asc' ? -1 : 1;
+        if (valA > valB) return direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    renderStaleMRsTable();
+    updateStaleMRSortIndicators();
+}
+
+function renderStaleMRsTable() {
+    const tbody = document.getElementById('staleMRsTableBody');
+    tbody.innerHTML = '';
+
+    allStaleMRs.forEach(mr => {
         const row = document.createElement('tr');
-        const createdDate = new Date(mr.created_at);
-        const daysOpen = Math.floor((new Date() - createdDate) / (1000 * 60 * 60 * 24));
 
         // Severity-based styling
         // 7-14 days = moderate (yellow)
         // 15-30 days = high (orange)
         // >30 days = critical (red)
         let severityClass = 'stale-moderate';
-        if (daysOpen > 30) {
+        if (mr.daysOpen > 30) {
             severityClass = 'stale-critical';
-        } else if (daysOpen > 14) {
+        } else if (mr.daysOpen > 14) {
             severityClass = 'stale-high';
         }
 
@@ -418,8 +475,8 @@ function updateStaleMRsTable(mergeRequests, staleThreshold = 7) {
             <td><a href="${mr.web_url}" target="_blank">${mr.title}</a></td>
             <td>${mr.project_name}</td>
             <td>${mr.author}</td>
-            <td><strong>${daysOpen} days</strong></td>
-            <td>${createdDate.toLocaleDateString()}</td>
+            <td><strong>${mr.daysOpen} days</strong></td>
+            <td>${mr.createdDate.toLocaleDateString()}</td>
             <td><a href="${mr.web_url}" target="_blank" class="btn-link">View MR →</a></td>
         `;
         tbody.appendChild(row);
@@ -484,13 +541,13 @@ function sortContributors() {
 }
 
 function updateSortIndicators() {
-    // Clear all sort indicators
-    document.querySelectorAll('th.sortable').forEach(th => {
+    // Clear all sort indicators for contributor table
+    document.querySelectorAll('#contributorTableBody').closest('table').querySelectorAll('th.sortable').forEach(th => {
         th.removeAttribute('data-sort');
     });
 
     // Set current sort indicator
-    const currentHeader = document.querySelector(`th.sortable[data-column="${currentSort.column}"]`);
+    const currentHeader = document.querySelector(`#contributorTableBody`).closest('table').querySelector(`th.sortable[data-column="${currentSort.column}"]`);
     if (currentHeader) {
         currentHeader.setAttribute('data-sort', currentSort.direction);
     }
@@ -507,6 +564,33 @@ function handleSort(column) {
     }
 
     updateContributorTable(allContributors);
+}
+
+function updateStaleMRSortIndicators() {
+    // Clear all sort indicators for stale MRs table
+    document.querySelectorAll('#staleMRsTableBody').closest('table').querySelectorAll('th.sortable').forEach(th => {
+        th.removeAttribute('data-sort');
+    });
+
+    // Set current sort indicator
+    const currentHeader = document.querySelector(`#staleMRsTableBody`).closest('table').querySelector(`th.sortable[data-column="${currentStaleMRSort.column}"]`);
+    if (currentHeader) {
+        currentHeader.setAttribute('data-sort', currentStaleMRSort.direction);
+    }
+}
+
+function handleStaleMRSort(column) {
+    if (currentStaleMRSort.column === column) {
+        // Toggle direction
+        currentStaleMRSort.direction = currentStaleMRSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        // New column, default to descending (or ascending for text columns)
+        currentStaleMRSort.column = column;
+        currentStaleMRSort.direction = (column === 'title' || column === 'project' || column === 'author') ? 'asc' : 'desc';
+    }
+
+    sortStaleMRs();
+    updateStaleMRSortIndicators();
 }
 
 async function refreshData() {
@@ -675,11 +759,21 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('applyCustomRange').addEventListener('click', applyCustomDateRange);
     document.getElementById('groupFilter').addEventListener('change', changeGroup);
 
-    // Add click handlers for sortable table headers
-    document.querySelectorAll('th.sortable').forEach(th => {
+    // Add click handlers for contributor table sortable headers
+    const contributorTable = document.querySelector('#contributorTableBody').closest('table');
+    contributorTable.querySelectorAll('th.sortable').forEach(th => {
         th.addEventListener('click', () => {
             const column = th.getAttribute('data-column');
             handleSort(column);
+        });
+    });
+
+    // Add click handlers for stale MRs table sortable headers
+    const staleMRsTable = document.querySelector('#staleMRsTableBody').closest('table');
+    staleMRsTable.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const column = th.getAttribute('data-column');
+            handleStaleMRSort(column);
         });
     });
 });
