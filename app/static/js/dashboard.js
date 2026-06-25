@@ -49,9 +49,12 @@ async function fetchMetrics() {
         // Build date range parameters
         let dateParams = '';
         if (currentStartDate && currentEndDate) {
-            // For custom dates, still send a default days parameter + custom range
-            dateParams = `days=90&start_date=${currentStartDate}&end_date=${currentEndDate}`;
-            console.log('Fetching metrics with custom range:', currentStartDate, 'to', currentEndDate, 'group:', currentGroup);
+            // Calculate days from start date to now to ensure backend fetches enough data
+            const startDate = new Date(currentStartDate);
+            const now = new Date();
+            const daysFromStart = Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)) + 1;
+            dateParams = `days=${daysFromStart}&start_date=${currentStartDate}&end_date=${currentEndDate}`;
+            console.log('Fetching metrics with custom range:', currentStartDate, 'to', currentEndDate, `(${daysFromStart} days back)`, 'group:', currentGroup);
         } else {
             dateParams = `days=${currentDays || 30}`;  // Default to 30 if null
             console.log('Fetching metrics with days:', currentDays, 'group:', currentGroup);
