@@ -336,6 +336,7 @@ function updateTopContributorsCommentsChart(contributorData) {
 
 function updateTables(mrData, contributorData) {
     updateMRTable(mrData.merge_requests);
+    updateStaleMRsTable(mrData.merge_requests, mrData.stale_threshold_days || 7);
     updateContributorTable(contributorData.all_contributors || contributorData.top_contributors);
 }
 
@@ -368,6 +369,57 @@ function updateMRTable(mergeRequests) {
             <td>${stateBadge}</td>
             <td>${timeToMerge}</td>
             <td>${new Date(mr.created_at).toLocaleDateString()}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function updateStaleMRsTable(mergeRequests, staleThreshold = 7) {
+    const tbody = document.getElementById('staleMRsTableBody');
+    const tableCard = document.getElementById('staleMRsTableCard');
+    tbody.innerHTML = '';
+
+    // Filter for stale MRs (open and older than threshold)
+    const staleMRs = mergeRequests
+        .filter(mr => {
+            const createdDate = new Date(mr.created_at);
+            const ageInDays = (new Date() - createdDate) / (1000 * 60 * 60 * 24);
+            return mr.state === 'opened' && ageInDays > staleThreshold;
+        })
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); // Oldest first
+
+    // Show/hide table based on whether there are stale MRs
+    if (staleMRs.length === 0) {
+        tableCard.style.display = 'none';
+        return;
+    }
+    tableCard.style.display = 'block';
+
+    staleMRs.forEach(mr => {
+        const row = document.createElement('tr');
+        const createdDate = new Date(mr.created_at);
+        const daysOpen = Math.floor((new Date() - createdDate) / (1000 * 60 * 60 * 24));
+
+        // Severity-based styling
+        // 7-14 days = moderate (yellow)
+        // 15-30 days = high (orange)
+        // >30 days = critical (red)
+        let severityClass = 'stale-moderate';
+        if (daysOpen > 30) {
+            severityClass = 'stale-critical';
+        } else if (daysOpen > 14) {
+            severityClass = 'stale-high';
+        }
+
+        row.classList.add(severityClass);
+
+        row.innerHTML = `
+            <td><a href="${mr.web_url}" target="_blank">${mr.title}</a></td>
+            <td>${mr.project_name}</td>
+            <td>${mr.author}</td>
+            <td><strong>${daysOpen} days</strong></td>
+            <td>${createdDate.toLocaleDateString()}</td>
+            <td><a href="${mr.web_url}" target="_blank" class="btn-link">View MR →</a></td>
         `;
         tbody.appendChild(row);
     });

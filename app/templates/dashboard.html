@@ -169,6 +169,26 @@
                 </tbody>
             </table>
         </div>
+
+        <div class="table-card" id="staleMRsTableCard" style="display: none;">
+            <h2>⚠️ Stale Merge Requests - Need Attention</h2>
+            <p class="stale-help-text">These MRs have been open for an extended period. Consider reviewing or closing them.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Project</th>
+                        <th>Author</th>
+                        <th>Days Open</th>
+                        <th>Created</th>
+                        <th>Link</th>
+                    </tr>
+                </thead>
+                <tbody id="staleMRsTableBody">
+                    <tr><td colspan="6" class="loading">No stale MRs</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <script src="/static/js/dashboard.js"></script>

@@ -63,11 +63,15 @@ Currently shows `0` in hybrid mode where comments table is not fully populated.
 - ✅ Color-code rows in Recent MRs table (orange highlight for stale)
 - ✅ Configurable threshold via STALE_MR_DAYS (default: 7 days)
 - ✅ Warning styling on metric card when stale count > 0
-- 📋 Filter option to show only stale MRs (future enhancement)
+- ✅ Dedicated "Stale MRs" table showing all stale MRs with actionable details
+- ✅ "Days Open" column for quick age assessment
+- ✅ Severity-based color coding (7-14 days = yellow, 15-30 days = orange, >30 days = red)
+- ✅ Sorted by oldest first (most urgent at top)
+- ✅ Direct links to each MR for quick action
 
-**Value:** Prevents MRs from being forgotten, reduces review backlog
+**Value:** Prevents MRs from being forgotten, reduces review backlog, provides actionable view for follow-up
 
-**Implementation:** Backend calculates stale count (open MRs older than threshold). Frontend highlights stale rows in Recent MRs table with orange background and adds warning-styled metric card.
+**Implementation:** Backend calculates stale count (open MRs older than threshold). Frontend highlights stale rows in Recent MRs table with orange background, adds warning-styled metric card, and displays dedicated stale MRs table with severity-based styling (only shown when stale MRs exist).
 
 ---
 
