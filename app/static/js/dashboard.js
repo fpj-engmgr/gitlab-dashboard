@@ -542,12 +542,13 @@ function sortContributors() {
 
 function updateSortIndicators() {
     // Clear all sort indicators for contributor table
-    document.querySelectorAll('#contributorTableBody').closest('table').querySelectorAll('th.sortable').forEach(th => {
+    const contributorTable = document.querySelector('#contributorTableBody').closest('table');
+    contributorTable.querySelectorAll('th.sortable').forEach(th => {
         th.removeAttribute('data-sort');
     });
 
     // Set current sort indicator
-    const currentHeader = document.querySelector(`#contributorTableBody`).closest('table').querySelector(`th.sortable[data-column="${currentSort.column}"]`);
+    const currentHeader = contributorTable.querySelector(`th.sortable[data-column="${currentSort.column}"]`);
     if (currentHeader) {
         currentHeader.setAttribute('data-sort', currentSort.direction);
     }
@@ -568,12 +569,13 @@ function handleSort(column) {
 
 function updateStaleMRSortIndicators() {
     // Clear all sort indicators for stale MRs table
-    document.querySelectorAll('#staleMRsTableBody').closest('table').querySelectorAll('th.sortable').forEach(th => {
+    const staleMRsTable = document.querySelector('#staleMRsTableBody').closest('table');
+    staleMRsTable.querySelectorAll('th.sortable').forEach(th => {
         th.removeAttribute('data-sort');
     });
 
     // Set current sort indicator
-    const currentHeader = document.querySelector(`#staleMRsTableBody`).closest('table').querySelector(`th.sortable[data-column="${currentStaleMRSort.column}"]`);
+    const currentHeader = staleMRsTable.querySelector(`th.sortable[data-column="${currentStaleMRSort.column}"]`);
     if (currentHeader) {
         currentHeader.setAttribute('data-sort', currentStaleMRSort.direction);
     }
