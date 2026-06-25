@@ -584,7 +584,7 @@ class MetricsService:
                     "username": c["username"],
                     "commit_count": 0,  # Not available for date-filtered view
                     "mr_count": c["mr_count"],
-                    "comment_count": 0,  # Not available for date-filtered view
+                    "comment_count": c["comment_count"],
                     "last_activity": c["last_activity"].isoformat() if c["last_activity"] else None,
                 })
             else:
