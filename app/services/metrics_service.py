@@ -615,7 +615,7 @@ class MetricsService:
                     "username": c["username"],
                     "commit_count": 0,
                     "mr_count": c["mr_count"],
-                    "comment_count": 0,
+                    "comment_count": c["comment_count"],
                     "last_activity": c["last_activity"].isoformat() if c["last_activity"] else None,
                 }
                 for c in top_10
