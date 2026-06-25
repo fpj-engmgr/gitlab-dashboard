@@ -111,15 +111,40 @@ function updateMetricCards(mrData, commitData, contributorData, commentData) {
     document.getElementById('merged-mrs').textContent = mrData.merged;
     document.getElementById('open-mrs').textContent = mrData.open;
     document.getElementById('avg-merge-time').textContent = mrData.avg_time_to_merge_hours.toFixed(1);
-    document.getElementById('avg-review-response').textContent = mrData.avg_review_response_hours.toFixed(1);
-    document.getElementById('median-review-response').textContent = mrData.median_review_response_hours.toFixed(1);
+
+    // Show/hide review metrics based on backend config
+    const reviewMetricsEnabled = mrData.review_metrics_enabled !== false;
+    const avgReviewCard = document.getElementById('avg-review-response')?.closest('.metric-card');
+    const medianReviewCard = document.getElementById('median-review-response')?.closest('.metric-card');
+
+    if (reviewMetricsEnabled) {
+        document.getElementById('avg-review-response').textContent = mrData.avg_review_response_hours.toFixed(1);
+        document.getElementById('median-review-response').textContent = mrData.median_review_response_hours.toFixed(1);
+        if (avgReviewCard) avgReviewCard.style.display = '';
+        if (medianReviewCard) medianReviewCard.style.display = '';
+    } else {
+        if (avgReviewCard) avgReviewCard.style.display = 'none';
+        if (medianReviewCard) medianReviewCard.style.display = 'none';
+    }
+
     document.getElementById('total-contributors').textContent = contributorData.total_contributors;
     document.getElementById('total-comments').textContent = commentData.total;
 }
 
 function updateCharts(mrData, contributorData) {
     updateMRStateChart(mrData);
-    updateReviewResponseByGroupChart(mrData);
+
+    // Only update review response chart if metrics are enabled
+    const reviewMetricsEnabled = mrData.review_metrics_enabled !== false;
+    const reviewChartCard = document.getElementById('reviewResponseByGroupChart')?.closest('.chart-card');
+
+    if (reviewMetricsEnabled) {
+        updateReviewResponseByGroupChart(mrData);
+        if (reviewChartCard) reviewChartCard.style.display = '';
+    } else {
+        if (reviewChartCard) reviewChartCard.style.display = 'none';
+    }
+
     updateTopContributorsMRChart(contributorData);
     updateTopContributorsCommentsChart(contributorData);
 }

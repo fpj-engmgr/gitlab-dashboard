@@ -110,6 +110,11 @@ class MetricsService:
 
     def refresh_comments(self, days: int = 30):
         """Refresh comments cache."""
+        # Skip comment fetching if review metrics are disabled (major performance improvement)
+        if not settings.enable_review_metrics:
+            self.update_cache_metadata("comments")
+            return
+
         # For MultiGroupGitLabClient, fetch comments from all groups if FETCH_COMMENT_DETAILS=True
         if isinstance(self.gitlab_client, MultiGroupGitLabClient):
             if settings.fetch_comment_details:
@@ -181,8 +186,18 @@ class MetricsService:
             if merged_mrs_with_time else 0
         )
 
-        # Calculate detailed review response time metrics
-        review_response_metrics = self._calculate_review_response_metrics(mrs)
+        # Calculate detailed review response time metrics (if enabled)
+        if settings.enable_review_metrics and settings.fetch_comment_details:
+            review_response_metrics = self._calculate_review_response_metrics(mrs)
+        else:
+            # Return empty metrics when disabled
+            review_response_metrics = {
+                "avg_hours": 0,
+                "median_hours": 0,
+                "by_project": {},
+                "by_group": {},
+                "sample_size": 0
+            }
 
         result = {
             "total": total,
@@ -190,6 +205,7 @@ class MetricsService:
             "open": open_mrs,
             "closed": closed,
             "avg_time_to_merge_hours": round(avg_time_to_merge, 2),
+            "review_metrics_enabled": settings.enable_review_metrics and settings.fetch_comment_details,
             "avg_review_response_hours": round(review_response_metrics["avg_hours"], 2),
             "median_review_response_hours": round(review_response_metrics["median_hours"], 2),
             "review_response_by_project": {
