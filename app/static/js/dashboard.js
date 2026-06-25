@@ -606,21 +606,29 @@ async function refreshData() {
     button.textContent = 'Phase 1: Fetching MRs...';
 
     try {
+        // Calculate days parameter for refresh
+        let refreshDays = currentDays || 30;
+        if (currentStartDate && currentEndDate) {
+            const startDate = new Date(currentStartDate);
+            const now = new Date();
+            refreshDays = Math.max(1, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)) + 1);
+        }
+
         // Phase 1: Fast refresh (MRs only)
-        await fetch(`/api/refresh?days=${currentDays}`, { method: 'POST' });
+        await fetch(`/api/refresh?days=${refreshDays}`, { method: 'POST' });
         await fetchMetrics();
 
         button.textContent = 'Phase 2: Background fetch...';
 
         // Phase 2: Trigger background fetch of detailed counts
-        fetch(`/api/refresh-detailed?days=${currentDays}`, { method: 'POST' })
+        fetch(`/api/refresh-detailed?days=${refreshDays}`, { method: 'POST' })
             .then(response => response.json())
             .then(data => {
                 console.log('Phase 2 started:', data.message);
 
                 // Poll for updates every 30 seconds
                 const pollInterval = setInterval(async () => {
-                    const result = await fetch(`/api/metrics/contributors?days=${currentDays}`).then(r => r.json());
+                    const result = await fetch(`/api/metrics/contributors?days=${refreshDays}`).then(r => r.json());
 
                     // Check if we have commit/comment counts (phase 2 complete)
                     if (result.total_commits > 0 || result.total_comments > 0) {
