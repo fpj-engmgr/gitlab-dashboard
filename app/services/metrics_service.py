@@ -170,8 +170,28 @@ class MetricsService:
         group_id: Optional[str] = None
     ):
         """Get merge request metrics, optionally filtered by group or custom date range."""
-        if self.should_refresh_cache("merge_requests"):
-            self.refresh_merge_requests(days=days)
+        from datetime import datetime
+
+        # Determine if we need to refresh based on date range
+        need_refresh = self.should_refresh_cache("merge_requests")
+        refresh_days = days
+
+        if start_date and end_date:
+            start_dt = datetime.fromisoformat(start_date)
+            end_dt = datetime.fromisoformat(end_date)
+
+            # Calculate days from start_date to now (to ensure we fetch enough data)
+            days_from_start = (datetime.utcnow() - start_dt).days + 1  # +1 to be inclusive
+            refresh_days = max(days_from_start, days)
+
+            # Check if we have any data that covers the requested range
+            oldest_mr = self.db.query(MergeRequest).order_by(MergeRequest.created_at.asc()).first()
+            if not oldest_mr or oldest_mr.created_at > start_dt:
+                # Cache doesn't go back far enough, force refresh
+                need_refresh = True
+
+        if need_refresh:
+            self.refresh_merge_requests(days=refresh_days)
 
         # Build query with optional group filter
         query = self.db.query(MergeRequest)
@@ -181,7 +201,6 @@ class MetricsService:
 
         # Apply custom date range filter if provided
         if start_date and end_date:
-            from datetime import datetime
             start_dt = datetime.fromisoformat(start_date)
             end_dt = datetime.fromisoformat(end_date)
             query = query.filter(
