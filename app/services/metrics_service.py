@@ -221,13 +221,20 @@ class MetricsService:
         open_mrs = len([mr for mr in mrs if mr.state == "opened"])
         closed = len([mr for mr in mrs if mr.state == "closed"])
 
-        # Calculate stale MRs (open MRs older than threshold)
+        # Calculate stale MRs - check ALL currently open MRs regardless of date range
+        # (stale detection is about what needs attention NOW, not what was created in a time period)
         stale_threshold = datetime.utcnow() - timedelta(days=settings.stale_mr_days)
-        stale_mrs = [
-            mr for mr in mrs
-            if mr.state == "opened" and mr.created_at and mr.created_at < stale_threshold
-        ]
-        stale_count = len(stale_mrs)
+        stale_query = self.db.query(MergeRequest).filter(
+            MergeRequest.state == "opened",
+            MergeRequest.created_at < stale_threshold
+        )
+
+        # Apply group filter if specified (but NOT date range filter)
+        if group_id or self.group_id:
+            filter_group = group_id or self.group_id
+            stale_query = stale_query.filter(MergeRequest.group_id == filter_group)
+
+        stale_count = stale_query.count()
 
         merged_mrs_with_time = [mr for mr in mrs if mr.time_to_merge_hours is not None]
         avg_time_to_merge = (
@@ -288,6 +295,34 @@ class MetricsService:
                 for mr in mrs
             ]
         }
+
+        # Include ALL currently open MRs for stale detection (not just date-filtered ones)
+        # This ensures the stale MRs table shows all open MRs needing attention
+        all_open_query = self.db.query(MergeRequest).filter(MergeRequest.state == "opened")
+        if group_id or self.group_id:
+            filter_group = group_id or self.group_id
+            all_open_query = all_open_query.filter(MergeRequest.group_id == filter_group)
+
+        all_open_mrs = all_open_query.all()
+
+        # Add any open MRs that aren't already in the date-filtered list
+        existing_ids = {mr.id for mr in mrs}
+        additional_open_mrs = [
+            {
+                "id": mr.id,
+                "project_name": mr.project_name,
+                "title": mr.title,
+                "author": mr.author,
+                "state": mr.state,
+                "created_at": mr.created_at.isoformat(),
+                "merged_at": None,
+                "time_to_merge_hours": None,
+                "web_url": mr.web_url,
+            }
+            for mr in all_open_mrs if mr.id not in existing_ids
+        ]
+
+        result["merge_requests"].extend(additional_open_mrs)
 
         # Add group breakdown if viewing all groups
         if not (group_id or self.group_id):
