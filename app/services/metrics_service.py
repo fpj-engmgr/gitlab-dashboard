@@ -162,8 +162,14 @@ class MetricsService:
         """Phase 2: Refresh with detailed commit/comment counts (slow background operation)."""
         self.refresh_contributors(days=days, fetch_details=True)
 
-    def get_merge_request_metrics(self, days: int = 30, group_id: Optional[str] = None):
-        """Get merge request metrics, optionally filtered by group."""
+    def get_merge_request_metrics(
+        self,
+        days: int = 30,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        group_id: Optional[str] = None
+    ):
+        """Get merge request metrics, optionally filtered by group or custom date range."""
         if self.should_refresh_cache("merge_requests"):
             self.refresh_merge_requests(days=days)
 
@@ -172,6 +178,16 @@ class MetricsService:
         if group_id or self.group_id:
             filter_group = group_id or self.group_id
             query = query.filter(MergeRequest.group_id == filter_group)
+
+        # Apply custom date range filter if provided
+        if start_date and end_date:
+            from datetime import datetime
+            start_dt = datetime.fromisoformat(start_date)
+            end_dt = datetime.fromisoformat(end_date)
+            query = query.filter(
+                MergeRequest.created_at >= start_dt,
+                MergeRequest.created_at <= end_dt
+            )
 
         mrs = query.all()
 
@@ -336,7 +352,12 @@ class MetricsService:
             "sample_size": len(response_times)
         }
 
-    def get_commit_metrics(self, days: int = 30):
+    def get_commit_metrics(
+        self,
+        days: int = 30,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ):
         """Get commit metrics - derived from contributor stats (hybrid approach)."""
         # In hybrid mode, we don't populate the commits table (too slow)
         # Instead, derive totals from contributor commit_counts
@@ -361,7 +382,13 @@ class MetricsService:
             "recent_commits": []  # Not available in hybrid mode (would be too slow)
         }
 
-    def get_comment_metrics(self, days: int = 30, group_id: Optional[str] = None):
+    def get_comment_metrics(
+        self,
+        days: int = 30,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        group_id: Optional[str] = None
+    ):
         """Get comment/review metrics, optionally filtered by group."""
         # In hybrid mode, we don't populate the comments table (too slow)
         # Instead, derive totals from contributor comment_counts
@@ -397,7 +424,13 @@ class MetricsService:
             "recent_comments": []  # Not available in hybrid mode (would be too slow)
         }
 
-    def get_contributor_metrics(self, days: int = 30, group_id: Optional[str] = None):
+    def get_contributor_metrics(
+        self,
+        days: int = 30,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        group_id: Optional[str] = None
+    ):
         """Get contributor metrics, optionally filtered by group."""
         if self.should_refresh_cache("contributors"):
             self.refresh_contributors(days=days)

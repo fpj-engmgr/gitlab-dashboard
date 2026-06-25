@@ -1,5 +1,7 @@
 let currentDays = 30;
-let currentGroup = null;  // Track selected group
+let currentStartDate = null;  // For custom date range
+let currentEndDate = null;    // For custom date range
+let currentGroup = null;      // Track selected group
 let charts = {};
 
 async function loadGroups() {
@@ -44,22 +46,30 @@ async function fetchMetrics() {
 
         const groupParam = currentGroup ? `&group_id=${currentGroup}` : '';
 
-        console.log('Fetching metrics with days:', currentDays, 'group:', currentGroup);
+        // Build date range parameters
+        let dateParams = '';
+        if (currentStartDate && currentEndDate) {
+            dateParams = `&start_date=${currentStartDate}&end_date=${currentEndDate}`;
+            console.log('Fetching metrics with custom range:', currentStartDate, 'to', currentEndDate, 'group:', currentGroup);
+        } else {
+            dateParams = `days=${currentDays}`;
+            console.log('Fetching metrics with days:', currentDays, 'group:', currentGroup);
+        }
 
         const [mrData, commitData, contributorData, commentData] = await Promise.all([
-            fetch(`/api/metrics/merge-requests?days=${currentDays}${groupParam}`).then(r => {
+            fetch(`/api/metrics/merge-requests?${dateParams}${groupParam}`).then(r => {
                 if (!r.ok) throw new Error(`MR endpoint failed: ${r.status}`);
                 return r.json();
             }),
-            fetch(`/api/metrics/commits?days=${currentDays}${groupParam}`).then(r => {
+            fetch(`/api/metrics/commits?${dateParams}${groupParam}`).then(r => {
                 if (!r.ok) throw new Error(`Commits endpoint failed: ${r.status}`);
                 return r.json();
             }),
-            fetch(`/api/metrics/contributors?days=${currentDays}${groupParam}`).then(r => {
+            fetch(`/api/metrics/contributors?${dateParams}${groupParam}`).then(r => {
                 if (!r.ok) throw new Error(`Contributors endpoint failed: ${r.status}`);
                 return r.json();
             }),
-            fetch(`/api/metrics/comments?days=${currentDays}${groupParam}`).then(r => {
+            fetch(`/api/metrics/comments?${dateParams}${groupParam}`).then(r => {
                 if (!r.ok) throw new Error(`Comments endpoint failed: ${r.status}`);
                 return r.json();
             })
@@ -469,17 +479,123 @@ async function refreshData() {
     }
 }
 
+function getDateRangeFromPreset(preset) {
+    const now = new Date();
+    let start, end;
+
+    switch(preset) {
+        case 'this-month':
+            start = new Date(now.getFullYear(), now.getMonth(), 1);
+            end = now;
+            break;
+        case 'last-month':
+            start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            end = new Date(now.getFullYear(), now.getMonth(), 0);
+            break;
+        case 'this-quarter':
+            const currentQuarter = Math.floor(now.getMonth() / 3);
+            start = new Date(now.getFullYear(), currentQuarter * 3, 1);
+            end = now;
+            break;
+        case 'last-quarter':
+            const lastQuarter = Math.floor(now.getMonth() / 3) - 1;
+            const year = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear();
+            const quarter = lastQuarter < 0 ? 3 : lastQuarter;
+            start = new Date(year, quarter * 3, 1);
+            end = new Date(year, quarter * 3 + 3, 0);
+            break;
+        default:
+            return null;
+    }
+
+    return {
+        start: start.toISOString().split('T')[0],
+        end: end.toISOString().split('T')[0]
+    };
+}
+
 function changeDateRange() {
-    const select = document.getElementById('dateRange');
-    currentDays = parseInt(select.value);
+    const select = document.getElementById('dateRangePreset');
+    const customDiv = document.getElementById('customDateRange');
+    const value = select.value;
+
+    if (value === 'custom') {
+        // Show custom date inputs
+        customDiv.style.display = 'inline-block';
+
+        // Load saved custom dates from localStorage if available
+        const savedStart = localStorage.getItem('customStartDate');
+        const savedEnd = localStorage.getItem('customEndDate');
+        if (savedStart) document.getElementById('startDate').value = savedStart;
+        if (savedEnd) document.getElementById('endDate').value = savedEnd;
+    } else {
+        customDiv.style.display = 'none';
+
+        if (['this-month', 'last-month', 'this-quarter', 'last-quarter'].includes(value)) {
+            // Use preset date range
+            const range = getDateRangeFromPreset(value);
+            currentStartDate = range.start;
+            currentEndDate = range.end;
+            currentDays = null;  // Clear days when using custom range
+
+            // Save to localStorage
+            localStorage.setItem('dateRangePreset', value);
+        } else {
+            // Use days-based range
+            currentDays = parseInt(value);
+            currentStartDate = null;
+            currentEndDate = null;
+
+            // Save to localStorage
+            localStorage.setItem('dateRangePreset', value);
+        }
+
+        fetchMetrics();
+    }
+}
+
+function applyCustomDateRange() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+
+    if (!startDate || !endDate) {
+        alert('Please select both start and end dates');
+        return;
+    }
+
+    if (new Date(startDate) > new Date(endDate)) {
+        alert('Start date must be before end date');
+        return;
+    }
+
+    currentStartDate = startDate;
+    currentEndDate = endDate;
+    currentDays = null;
+
+    // Save to localStorage
+    localStorage.setItem('customStartDate', startDate);
+    localStorage.setItem('customEndDate', endDate);
+    localStorage.setItem('dateRangePreset', 'custom');
+
     fetchMetrics();
+}
+
+function loadSavedDateRange() {
+    const savedPreset = localStorage.getItem('dateRangePreset');
+    if (savedPreset) {
+        const select = document.getElementById('dateRangePreset');
+        select.value = savedPreset;
+        changeDateRange();  // Apply the saved preset
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     loadGroups();  // Load and populate group selector
+    loadSavedDateRange();  // Load saved date range preference
     fetchMetrics();
     document.getElementById('refreshBtn').addEventListener('click', refreshData);
-    document.getElementById('dateRange').addEventListener('change', changeDateRange);
+    document.getElementById('dateRangePreset').addEventListener('change', changeDateRange);
+    document.getElementById('applyCustomRange').addEventListener('click', applyCustomDateRange);
     document.getElementById('groupFilter').addEventListener('change', changeGroup);
 
     // Add click handlers for sortable table headers

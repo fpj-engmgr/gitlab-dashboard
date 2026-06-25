@@ -32,45 +32,68 @@ async def get_groups():
 @router.get("/api/metrics/merge-requests")
 async def get_merge_request_metrics(
     days: int = 30,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     group_id: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """Get merge request metrics, optionally filtered by group."""
+    """Get merge request metrics, optionally filtered by group or custom date range."""
     service = MetricsService(db, group_id=group_id)
-    return service.get_merge_request_metrics(days=days, group_id=group_id)
+    return service.get_merge_request_metrics(
+        days=days,
+        start_date=start_date,
+        end_date=end_date,
+        group_id=group_id
+    )
 
 
 @router.get("/api/metrics/commits")
 async def get_commit_metrics(
     days: int = 30,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     group_id: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """Get commit activity metrics, optionally filtered by group."""
+    """Get commit activity metrics, optionally filtered by group or custom date range."""
     service = MetricsService(db, group_id=group_id)
-    return service.get_commit_metrics(days=days)
+    return service.get_commit_metrics(days=days, start_date=start_date, end_date=end_date)
 
 
 @router.get("/api/metrics/contributors")
 async def get_contributor_metrics(
     days: int = 30,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     group_id: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """Get contributor statistics, optionally filtered by group."""
+    """Get contributor statistics, optionally filtered by group or custom date range."""
     service = MetricsService(db, group_id=group_id)
-    return service.get_contributor_metrics(days=days, group_id=group_id)
+    return service.get_contributor_metrics(
+        days=days,
+        start_date=start_date,
+        end_date=end_date,
+        group_id=group_id
+    )
 
 
 @router.get("/api/metrics/comments")
 async def get_comment_metrics(
     days: int = 30,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     group_id: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """Get MR comment/review metrics, optionally filtered by group."""
+    """Get MR comment/review metrics, optionally filtered by group or custom date range."""
     service = MetricsService(db, group_id=group_id)
-    return service.get_comment_metrics(days=days, group_id=group_id)
+    return service.get_comment_metrics(
+        days=days,
+        start_date=start_date,
+        end_date=end_date,
+        group_id=group_id
+    )
 
 
 @router.post("/api/refresh")

@@ -23,14 +23,28 @@
                 <!-- Populated dynamically from /api/groups -->
             </select>
 
-            <label for="dateRange">Time Range:</label>
-            <select id="dateRange">
+            <label for="dateRangePreset">Time Range:</label>
+            <select id="dateRangePreset">
                 <option value="7">Last 7 Days</option>
                 <option value="14">Last 14 Days</option>
                 <option value="30" selected>Last 30 Days</option>
                 <option value="60">Last 60 Days</option>
                 <option value="90">Last 90 Days</option>
+                <option value="this-month">This Month</option>
+                <option value="last-month">Last Month</option>
+                <option value="this-quarter">This Quarter</option>
+                <option value="last-quarter">Last Quarter</option>
+                <option value="custom">Custom Range...</option>
             </select>
+
+            <div id="customDateRange" style="display: none; margin-left: 10px;">
+                <label for="startDate">From:</label>
+                <input type="date" id="startDate">
+                <label for="endDate" style="margin-left: 10px;">To:</label>
+                <input type="date" id="endDate">
+                <button id="applyCustomRange">Apply</button>
+            </div>
+
             <button id="refreshBtn">Refresh Data</button>
         </div>
 
