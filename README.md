@@ -166,6 +166,42 @@ A web dashboard for monitoring GitLab metrics for your engineering team. Uses a 
 
 The dashboard will automatically fetch and cache data from GitLab on first load.
 
+## Using Custom Date Ranges
+
+The dashboard supports flexible date range selection including presets (This Month, Last Quarter, etc.) and custom date ranges.
+
+### ⚠️ Important: Historical Date Ranges Require Manual Refresh
+
+**The dashboard caches data for performance**. By default, it fetches the last 30-60 days of data. When selecting a date range further back in history, you must manually refresh to fetch that data.
+
+**When to click "Refresh Data":**
+- ✅ Selecting **"Last Quarter"** (if more than ~60 days ago)
+- ✅ Selecting **"Last Month"** (if more than ~60 days ago)  
+- ✅ Using **Custom Range** for any period outside the last 60 days
+- ✅ First time viewing a historical period
+
+**You do NOT need to refresh for:**
+- ❌ Last 7, 14, 30 days (already cached)
+- ❌ This Month, This Quarter (if current period)
+- ❌ Switching between groups/projects (uses same cache)
+
+### How It Works:
+
+1. **Select your date range** (e.g., "Last Quarter" for Q1 2026)
+2. **Click "Refresh Data" button** (if the period is older than cached data)
+3. **Wait for Phase 1** to complete (~30 seconds)
+4. **Phase 2 runs in background** (detailed comment counts, takes several minutes)
+5. **View your metrics** for the selected period
+
+**Example:**
+- Today is June 25, 2026
+- You select "Last Quarter" (Jan 1 - Mar 31, 2026)
+- That's ~175 days ago
+- Click "Refresh Data" to fetch Q1 2026 MRs from GitLab
+- Dashboard will show metrics for that quarter
+
+**Performance Tip:** The cache duration is controlled by `CACHE_DURATION_HOURS` (default: 6 hours). Increase this to 12 or 24 hours if you don't need frequent updates.
+
 ## API Endpoints
 
 - `GET /` - Main dashboard page
