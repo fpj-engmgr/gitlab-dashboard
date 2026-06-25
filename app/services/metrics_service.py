@@ -234,6 +234,13 @@ class MetricsService:
             if merged_mrs_with_time else 0
         )
 
+        # Calculate median merge time
+        from statistics import median
+        median_time_to_merge = (
+            median([mr.time_to_merge_hours for mr in merged_mrs_with_time])
+            if merged_mrs_with_time else 0
+        )
+
         # Calculate detailed review response time metrics (if enabled)
         if settings.enable_review_metrics and settings.fetch_comment_details:
             review_response_metrics = self._calculate_review_response_metrics(mrs)
@@ -255,6 +262,7 @@ class MetricsService:
             "stale": stale_count,
             "stale_threshold_days": settings.stale_mr_days,
             "avg_time_to_merge_hours": round(avg_time_to_merge, 2),
+            "median_time_to_merge_hours": round(median_time_to_merge, 2),
             "review_metrics_enabled": settings.enable_review_metrics and settings.fetch_comment_details,
             "avg_review_response_hours": round(review_response_metrics["avg_hours"], 2),
             "median_review_response_hours": round(review_response_metrics["median_hours"], 2),

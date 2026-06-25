@@ -122,6 +122,7 @@ function updateMetricCards(mrData, commitData, contributorData, commentData) {
     document.getElementById('merged-mrs').textContent = mrData.merged;
     document.getElementById('open-mrs').textContent = mrData.open;
     document.getElementById('avg-merge-time').textContent = mrData.avg_time_to_merge_hours.toFixed(1);
+    document.getElementById('median-merge-time').textContent = mrData.median_time_to_merge_hours.toFixed(1);
 
     // Update stale MRs
     const staleMrs = mrData.stale || 0;
