@@ -14,14 +14,18 @@ A web dashboard for monitoring GitLab metrics for your engineering team. Uses a 
 
 - **Multi-Source Tracking**: Monitor multiple GitLab groups and individual projects in a single dashboard
 - **Group Filtering**: View metrics across all sources or filter by specific group/project
-- **Merge Request Metrics**: Track total, merged, open, and closed MRs with average time to merge
-- **Review Response Time Metrics** ⚡: Track average and median time to first review (configurable, adds ~8 min to refresh)
-- **Code Review Metrics**: Monitor MR comment activity and trends  
-- **Contributor Stats**: Sortable table showing ALL team members (even with 0 contributions)
-- **Interactive Sorting**: Click column headers to sort contributors by any metric (ascending/descending)
+- **Merge Request Metrics**: Track total, merged, open, and closed MRs with average and median time to merge
+- **Stale MR Detection** 🚨: Identify MRs needing attention with configurable threshold (default 7 days)
+  - Metric card with warning styling when stale MRs detected
+  - Dedicated sortable table with severity-based color coding (yellow → orange → red)
+  - Sort by title, project, author, days open, or creation date
+- **Review Response Time Metrics** ⚡: Track 90th percentile and median time to first review (configurable, adds ~8 min to refresh)
+- **Code Review Metrics**: Monitor MR comment activity and trends with top contributors chart
+- **Custom Date Range Picker**: Select specific periods (This Month, Last Quarter, etc.) or custom date ranges
+- **Contributor Stats**: Sortable table showing ALL team members (even with 0 contributions) with real names
+- **Interactive Sorting**: Click column headers to sort tables by any metric (ascending/descending)
 - **SQLite Caching**: Fast dashboard loads with automatic cache refresh
 - **Interactive Charts**: Beautiful visualizations using Chart.js
-- **Time Range Selection**: View metrics for 7, 14, 30, 60, or 90 days
 - **Per-Group Breakdown**: See metrics split by each configured source
 
 ## Tech Stack
@@ -184,6 +188,7 @@ Edit `.env` to customize:
 - `TEAM_MEMBERS_FILE`: Path to JSON file with team member usernames (default: team_members.json)
 - `FETCH_COMMENT_DETAILS`: Set to `True` to fetch MR comments (required for review metrics, slower)
 - `ENABLE_REVIEW_METRICS`: Set to `True` to enable review response time metrics (default: `True`)
+- `STALE_MR_DAYS`: MRs open longer than this many days are highlighted as stale (default: 7)
 
 ### ⚠️ Review Response Time Metrics - Performance Impact
 
@@ -219,6 +224,31 @@ ENABLE_REVIEW_METRICS=True   # Enable review response metrics
 **Note**: When review metrics are disabled, the avg/median review time cards and review response chart will be automatically hidden from the dashboard.
 
 **Performance Tip**: Increase `CACHE_DURATION_HOURS` to 12 or 24 for even better performance if you don't need real-time data.
+
+### 🚨 Stale MR Detection
+
+The dashboard highlights merge requests that have been open longer than a configurable threshold to help prevent MRs from being forgotten.
+
+**Configuration:**
+```bash
+STALE_MR_DAYS=7  # MRs older than this are highlighted (default: 7 days)
+```
+
+**Features:**
+- **Metric Card**: Shows count of stale MRs with warning styling (orange gradient)
+- **Visual Highlighting**: Stale MRs in Recent MRs table have orange background
+- **Dedicated Table**: "Stale Merge Requests - Need Attention" table with:
+  - Severity-based color coding:
+    - 🟡 **7-14 days**: Yellow (moderate - needs attention soon)
+    - 🟠 **15-30 days**: Orange (high priority - overdue for review)
+    - 🔴 **>30 days**: Red (critical - urgent action required)
+  - Sortable by any column (title, project, author, days open, created date)
+  - Direct links to each MR for quick action
+  - Only appears when stale MRs exist
+
+**When to adjust threshold:**
+- **Increase (10-14 days)**: For teams with longer review cycles or larger backlogs
+- **Decrease (3-5 days)**: For fast-moving teams that need quick turnaround
 
 ### Team Member Configuration (Required)
 
