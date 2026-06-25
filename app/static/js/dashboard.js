@@ -52,12 +52,14 @@ async function fetchMetrics() {
             // Calculate days from start date to now to ensure backend fetches enough data
             const startDate = new Date(currentStartDate);
             const now = new Date();
-            const daysFromStart = Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)) + 1;
-            dateParams = `days=${daysFromStart}&start_date=${currentStartDate}&end_date=${currentEndDate}`;
+            const daysFromStart = Math.max(1, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)) + 1);
+            dateParams = `days=${Math.floor(daysFromStart)}&start_date=${currentStartDate}&end_date=${currentEndDate}`;
             console.log('Fetching metrics with custom range:', currentStartDate, 'to', currentEndDate, `(${daysFromStart} days back)`, 'group:', currentGroup);
         } else {
-            dateParams = `days=${currentDays || 30}`;  // Default to 30 if null
-            console.log('Fetching metrics with days:', currentDays, 'group:', currentGroup);
+            // Ensure we send a valid integer, not null or undefined
+            const validDays = (currentDays && !isNaN(currentDays)) ? currentDays : 30;
+            dateParams = `days=${validDays}`;
+            console.log('Fetching metrics with days:', validDays, 'group:', currentGroup);
         }
 
         const [mrData, commitData, contributorData, commentData] = await Promise.all([
