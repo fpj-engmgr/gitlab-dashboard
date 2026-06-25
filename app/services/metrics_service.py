@@ -340,11 +340,22 @@ class MetricsService:
 
         # Calculate aggregated metrics
         # Use 90th percentile instead of mean to avoid outlier skew
-        if response_times:
+        if len(response_times) >= 10:
+            # Use 90th percentile for sufficient data
             sorted_times = sorted(response_times)
             p90_hours = quantiles(sorted_times, n=10)[8]  # 90th percentile (9th of 10 quantiles)
             median_hours = median(sorted_times)
+        elif len(response_times) >= 2:
+            # Use max for small samples (quantiles requires at least 2 points)
+            sorted_times = sorted(response_times)
+            p90_hours = max(sorted_times)
+            median_hours = median(sorted_times)
+        elif len(response_times) == 1:
+            # Single data point
+            p90_hours = response_times[0]
+            median_hours = response_times[0]
         else:
+            # No data
             p90_hours = 0
             median_hours = 0
 
@@ -354,7 +365,7 @@ class MetricsService:
             if len(times) >= 10:
                 # Use 90th percentile for projects with enough data
                 project_p90[project] = quantiles(sorted(times), n=10)[8]
-            else:
+            elif len(times) > 0:
                 # Use max for small samples (approximation of upper bound)
                 project_p90[project] = max(times)
 
@@ -364,7 +375,7 @@ class MetricsService:
             if len(times) >= 10:
                 # Use 90th percentile for groups with enough data
                 group_p90[group] = quantiles(sorted(times), n=10)[8]
-            else:
+            elif len(times) > 0:
                 # Use max for small samples (approximation of upper bound)
                 group_p90[group] = max(times)
 
