@@ -123,6 +123,20 @@ function updateMetricCards(mrData, commitData, contributorData, commentData) {
     document.getElementById('open-mrs').textContent = mrData.open;
     document.getElementById('avg-merge-time').textContent = mrData.avg_time_to_merge_hours.toFixed(1);
 
+    // Update stale MRs
+    const staleMrs = mrData.stale || 0;
+    const staleThreshold = mrData.stale_threshold_days || 7;
+    document.getElementById('stale-mrs').textContent = staleMrs;
+    document.getElementById('stale-label').textContent = `Open >${staleThreshold}d`;
+
+    // Color-code stale count (yellow warning if any stale MRs)
+    const staleCard = document.querySelector('.stale-card');
+    if (staleMrs > 0) {
+        staleCard.classList.add('warning');
+    } else {
+        staleCard.classList.remove('warning');
+    }
+
     // Show/hide review metrics based on backend config
     const reviewMetricsEnabled = mrData.review_metrics_enabled !== false;
     const avgReviewCard = document.getElementById('avg-review-response')?.closest('.metric-card');
@@ -337,6 +351,15 @@ function updateMRTable(mergeRequests) {
         const row = document.createElement('tr');
         const stateBadge = `<span class="badge ${mr.state}">${mr.state}</span>`;
         const timeToMerge = mr.time_to_merge_hours ? `${mr.time_to_merge_hours.toFixed(1)}h` : 'N/A';
+
+        // Calculate age and mark stale MRs
+        const createdDate = new Date(mr.created_at);
+        const ageInDays = (new Date() - createdDate) / (1000 * 60 * 60 * 24);
+        const isStale = mr.state === 'opened' && ageInDays > 7; // matches backend threshold
+
+        if (isStale) {
+            row.classList.add('stale-mr');
+        }
 
         row.innerHTML = `
             <td><a href="${mr.web_url}" target="_blank">${mr.title}</a></td>

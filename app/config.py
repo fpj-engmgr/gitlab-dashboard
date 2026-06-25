@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     fetch_commit_details: bool = False  # Set True to fetch individual commit details (slower)
     fetch_comment_details: bool = False  # Set True to fetch MR comments (slower)
     enable_review_metrics: bool = True  # Set False to disable review response time metrics (requires fetch_comment_details)
+    stale_mr_days: int = 7  # MRs older than this many days are considered stale
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 

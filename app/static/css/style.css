@@ -90,6 +90,15 @@ header p {
     text-align: center;
 }
 
+.metric-card.warning {
+    background: linear-gradient(135deg, #fff5e6 0%, #ffe8cc 100%);
+    border-left: 4px solid #ff9800;
+}
+
+.metric-card.warning .value {
+    color: #e65100;
+}
+
 .metric-card h3 {
     color: #666;
     font-size: 0.9em;
@@ -230,6 +239,15 @@ table td {
 
 table tbody tr:hover {
     background: #f8f9fa;
+}
+
+table tbody tr.stale-mr {
+    background: #fff9e6;
+    border-left: 3px solid #ff9800;
+}
+
+table tbody tr.stale-mr:hover {
+    background: #fff3d6;
 }
 
 .status-badge {

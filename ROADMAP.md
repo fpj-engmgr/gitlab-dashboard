@@ -55,16 +55,19 @@ Currently shows `0` in hybrid mode where comments table is not fully populated.
 
 ---
 
-### 📋 Stale MR Detection
-**Priority:** High | **Effort:** Low | **Category:** Metrics
+### ✅ Stale MR Detection
+**Priority:** High | **Effort:** Low | **Category:** Metrics | **Status:** Completed
 
-Highlight merge requests that need attention:
-- Add "Stale MRs" metric card (count of MRs >7 days old)
-- Color-code rows in Recent MRs table (red for stale)
-- Configurable threshold (default: 7 days)
-- Filter option to show only stale MRs
+~~Highlight merge requests that need attention:~~
+- ✅ Add "Stale MRs" metric card (count of MRs >7 days old)
+- ✅ Color-code rows in Recent MRs table (orange highlight for stale)
+- ✅ Configurable threshold via STALE_MR_DAYS (default: 7 days)
+- ✅ Warning styling on metric card when stale count > 0
+- 📋 Filter option to show only stale MRs (future enhancement)
 
 **Value:** Prevents MRs from being forgotten, reduces review backlog
+
+**Implementation:** Backend calculates stale count (open MRs older than threshold). Frontend highlights stale rows in Recent MRs table with orange background and adds warning-styled metric card.
 
 ---
 

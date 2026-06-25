@@ -220,6 +220,14 @@ class MetricsService:
         open_mrs = len([mr for mr in mrs if mr.state == "opened"])
         closed = len([mr for mr in mrs if mr.state == "closed"])
 
+        # Calculate stale MRs (open MRs older than threshold)
+        stale_threshold = datetime.utcnow() - timedelta(days=settings.stale_mr_days)
+        stale_mrs = [
+            mr for mr in mrs
+            if mr.state == "opened" and mr.created_at and mr.created_at < stale_threshold
+        ]
+        stale_count = len(stale_mrs)
+
         merged_mrs_with_time = [mr for mr in mrs if mr.time_to_merge_hours is not None]
         avg_time_to_merge = (
             sum(mr.time_to_merge_hours for mr in merged_mrs_with_time) / len(merged_mrs_with_time)
@@ -244,6 +252,8 @@ class MetricsService:
             "merged": merged,
             "open": open_mrs,
             "closed": closed,
+            "stale": stale_count,
+            "stale_threshold_days": settings.stale_mr_days,
             "avg_time_to_merge_hours": round(avg_time_to_merge, 2),
             "review_metrics_enabled": settings.enable_review_metrics and settings.fetch_comment_details,
             "avg_review_response_hours": round(review_response_metrics["avg_hours"], 2),
