@@ -51,6 +51,31 @@ class MultiGroupGitLabClient:
         logger.info(f"Total MRs fetched from all groups: {len(all_mrs)}")
         return all_mrs
 
+    def get_all_comments(self, days: int = 30) -> List[Dict[str, Any]]:
+        """Fetch comments from all groups in parallel."""
+        all_comments = []
+        max_workers = min(len(self.clients), 5)  # Cap at 5 concurrent groups
+
+        logger.info(f"Fetching comments from {len(self.clients)} groups in parallel (max {max_workers} workers)")
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(client.get_comments, days): group_id
+                for group_id, client in self.clients.items()
+            }
+
+            for future in as_completed(futures):
+                group_id = futures[future]
+                try:
+                    comments = future.result()
+                    all_comments.extend(comments)
+                    logger.info(f"Group {group_id}: fetched {len(comments)} comments")
+                except Exception as e:
+                    logger.error(f"Error fetching comments for group {group_id}: {e}")
+
+        logger.info(f"Total comments fetched from all groups: {len(all_comments)}")
+        return all_comments
+
     def get_contributor_stats_from_mrs(self, mrs_data: List[Dict[str, Any]], days: int = 30, fetch_details: bool = True) -> List[Dict[str, Any]]:
         """
         Get contributor stats from MR data across all groups.

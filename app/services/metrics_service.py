@@ -110,12 +110,17 @@ class MetricsService:
 
     def refresh_comments(self, days: int = 30):
         """Refresh comments cache."""
-        # Skip for MultiGroupGitLabClient - comments derived from contributor stats in hybrid mode
+        # For MultiGroupGitLabClient, fetch comments from all groups if FETCH_COMMENT_DETAILS=True
         if isinstance(self.gitlab_client, MultiGroupGitLabClient):
-            self.update_cache_metadata("comments")
-            return
-
-        comments_data = self.gitlab_client.get_comments(days=days)
+            if settings.fetch_comment_details:
+                # Fetch comments from all groups
+                comments_data = self.gitlab_client.get_all_comments(days=days)
+            else:
+                # Skip in hybrid mode (comments derived from contributor stats)
+                self.update_cache_metadata("comments")
+                return
+        else:
+            comments_data = self.gitlab_client.get_comments(days=days)
 
         self.db.query(Comment).delete()
 
@@ -248,9 +253,9 @@ class MetricsService:
         by_group = {}
 
         for mr in mrs:
-            # Get first comment on this MR
+            # Get first comment on this MR (match GitLab IID, not auto-increment id)
             first_comment = self.db.query(Comment).filter(
-                Comment.mr_id == mr.id
+                Comment.mr_id == mr.iid
             ).order_by(Comment.created_at.asc()).first()
 
             if first_comment and mr.created_at:

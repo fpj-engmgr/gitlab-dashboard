@@ -458,7 +458,7 @@ class GitLabClient:
 
                         comment_data = {
                             'note_id': note.id,
-                            'mr_id': mr.id,
+                            'mr_id': mr.iid,
                             'project_id': project_id,
                             'project_name': getattr(mr, 'references', {}).get('full', 'unknown').split('!')[0],
                             'author': author,
