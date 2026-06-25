@@ -176,8 +176,8 @@ class MetricsService:
             if merged_mrs_with_time else 0
         )
 
-        # Calculate review response time (MR creation to first comment)
-        avg_review_response_hours = self._calculate_avg_review_response_time(mrs)
+        # Calculate detailed review response time metrics
+        review_response_metrics = self._calculate_review_response_metrics(mrs)
 
         result = {
             "total": total,
@@ -185,7 +185,14 @@ class MetricsService:
             "open": open_mrs,
             "closed": closed,
             "avg_time_to_merge_hours": round(avg_time_to_merge, 2),
-            "avg_review_response_hours": round(avg_review_response_hours, 2),
+            "avg_review_response_hours": round(review_response_metrics["avg_hours"], 2),
+            "median_review_response_hours": round(review_response_metrics["median_hours"], 2),
+            "review_response_by_project": {
+                k: round(v, 2) for k, v in review_response_metrics["by_project"].items()
+            },
+            "review_response_by_group": {
+                k: round(v, 2) for k, v in review_response_metrics["by_group"].items()
+            },
             "merge_requests": [
                 {
                     "id": mr.id,
@@ -227,10 +234,18 @@ class MetricsService:
         return groups
 
     def _calculate_avg_review_response_time(self, mrs: List[MergeRequest]) -> float:
-        """Calculate average time from MR creation to first comment."""
+        """Calculate average time from MR creation to first comment (backward compatibility)."""
+        detailed = self._calculate_review_response_metrics(mrs)
+        return detailed["avg_hours"]
+
+    def _calculate_review_response_metrics(self, mrs: List[MergeRequest]) -> Dict[str, Any]:
+        """Calculate detailed review response time metrics."""
         from app.models.schemas import Comment
+        from statistics import median
 
         response_times = []
+        by_project = {}
+        by_group = {}
 
         for mr in mrs:
             # Get first comment on this MR
@@ -242,10 +257,44 @@ class MetricsService:
                 # Calculate hours from MR creation to first comment
                 time_diff = first_comment.created_at - mr.created_at
                 hours = time_diff.total_seconds() / 3600
+
                 response_times.append(hours)
 
-        # Return average, or 0 if no data
-        return sum(response_times) / len(response_times) if response_times else 0
+                # Track by project
+                project = mr.project_name or "Unknown"
+                if project not in by_project:
+                    by_project[project] = []
+                by_project[project].append(hours)
+
+                # Track by group
+                group = mr.group_id or "default"
+                if group not in by_group:
+                    by_group[group] = []
+                by_group[group].append(hours)
+
+        # Calculate aggregated metrics
+        avg_hours = sum(response_times) / len(response_times) if response_times else 0
+        median_hours = median(response_times) if response_times else 0
+
+        # Calculate averages by project
+        project_avgs = {
+            project: sum(times) / len(times)
+            for project, times in by_project.items()
+        }
+
+        # Calculate averages by group
+        group_avgs = {
+            group: sum(times) / len(times)
+            for group, times in by_group.items()
+        }
+
+        return {
+            "avg_hours": avg_hours,
+            "median_hours": median_hours,
+            "by_project": project_avgs,
+            "by_group": group_avgs,
+            "sample_size": len(response_times)
+        }
 
     def get_commit_metrics(self, days: int = 30):
         """Get commit metrics - derived from contributor stats (hybrid approach)."""

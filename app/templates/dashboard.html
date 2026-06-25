@@ -61,6 +61,11 @@
                 <div class="label">Hours to First Comment</div>
             </div>
             <div class="metric-card">
+                <h3>Median Review Time</h3>
+                <div class="value" id="median-review-response">-</div>
+                <div class="label">Hours (Median)</div>
+            </div>
+            <div class="metric-card">
                 <h3>Contributors</h3>
                 <div class="value" id="total-contributors">-</div>
                 <div class="label">Active Contributors</div>
@@ -94,11 +99,17 @@
             </div>
         </div>
 
-        <div class="charts-grid single-chart">
+        <div class="charts-grid">
             <div class="chart-card">
                 <h2>Merge Request Status</h2>
                 <div class="chart-container small">
                     <canvas id="mrStateChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h2>Review Response Time by Group</h2>
+                <div class="chart-container small">
+                    <canvas id="reviewResponseByGroupChart"></canvas>
                 </div>
             </div>
         </div>

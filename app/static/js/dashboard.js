@@ -112,12 +112,14 @@ function updateMetricCards(mrData, commitData, contributorData, commentData) {
     document.getElementById('open-mrs').textContent = mrData.open;
     document.getElementById('avg-merge-time').textContent = mrData.avg_time_to_merge_hours.toFixed(1);
     document.getElementById('avg-review-response').textContent = mrData.avg_review_response_hours.toFixed(1);
+    document.getElementById('median-review-response').textContent = mrData.median_review_response_hours.toFixed(1);
     document.getElementById('total-contributors').textContent = contributorData.total_contributors;
     document.getElementById('total-comments').textContent = commentData.total;
 }
 
 function updateCharts(mrData, contributorData) {
     updateMRStateChart(mrData);
+    updateReviewResponseByGroupChart(mrData);
     updateTopContributorsMRChart(contributorData);
     updateTopContributorsCommentsChart(contributorData);
 }
@@ -144,6 +146,54 @@ function updateMRStateChart(mrData) {
             plugins: {
                 legend: {
                     position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function updateReviewResponseByGroupChart(mrData) {
+    const ctx = document.getElementById('reviewResponseByGroupChart').getContext('2d');
+
+    if (charts.reviewResponseByGroup) {
+        charts.reviewResponseByGroup.destroy();
+    }
+
+    const byGroup = mrData.review_response_by_group || {};
+    const groupIds = Object.keys(byGroup);
+    const hours = groupIds.map(gid => byGroup[gid]);
+
+    if (groupIds.length === 0) {
+        // No data - show placeholder
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        return;
+    }
+
+    charts.reviewResponseByGroup = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: groupIds,
+            datasets: [{
+                label: 'Avg Hours to First Review',
+                data: hours,
+                backgroundColor: '#17a2b8'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Hours'
+                    }
                 }
             }
         }
