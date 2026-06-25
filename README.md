@@ -15,6 +15,7 @@ A web dashboard for monitoring GitLab metrics for your engineering team. Uses a 
 - **Multi-Source Tracking**: Monitor multiple GitLab groups and individual projects in a single dashboard
 - **Group Filtering**: View metrics across all sources or filter by specific group/project
 - **Merge Request Metrics**: Track total, merged, open, and closed MRs with average time to merge
+- **Review Response Time Metrics** ⚡: Track average and median time to first review (configurable, adds ~8 min to refresh)
 - **Code Review Metrics**: Monitor MR comment activity and trends  
 - **Contributor Stats**: Sortable table showing ALL team members (even with 0 contributions)
 - **Interactive Sorting**: Click column headers to sort contributors by any metric (ascending/descending)
@@ -159,6 +160,41 @@ Edit `.env` to customize:
 - `DATABASE_URL`: SQLite database location
 - `CACHE_DURATION_HOURS`: How long to cache data before refreshing (default: 6 hours)
 - `TEAM_MEMBERS_FILE`: Path to JSON file with team member usernames (default: team_members.json)
+- `FETCH_COMMENT_DETAILS`: Set to `True` to fetch MR comments (required for review metrics, slower)
+- `ENABLE_REVIEW_METRICS`: Set to `True` to enable review response time metrics (default: `True`)
+
+### ⚠️ Review Response Time Metrics - Performance Impact
+
+The dashboard includes review response time metrics (average and median time from MR creation to first comment). However, **enabling these metrics significantly increases data refresh time**:
+
+- **With `ENABLE_REVIEW_METRICS=True`**: ~8 minutes refresh time (fetches detailed comment data)
+- **With `ENABLE_REVIEW_METRICS=False`**: ~34 seconds refresh time (skips comment fetching)
+
+**Performance difference: ~14x faster when disabled!**
+
+To disable review metrics in your `.env` file:
+```bash
+FETCH_COMMENT_DETAILS=True
+ENABLE_REVIEW_METRICS=False  # Disable for faster refresh
+```
+
+To enable review metrics (default):
+```bash
+FETCH_COMMENT_DETAILS=True
+ENABLE_REVIEW_METRICS=True   # Enable review response metrics
+```
+
+**When to disable:**
+- You don't need review response time insights
+- You want faster dashboard refresh times
+- You're working with very large groups (100+ MRs)
+
+**When to enable:**
+- You want to track team review responsiveness
+- You can tolerate longer refresh times for the insights
+- You're analyzing team code review practices
+
+**Note**: When review metrics are disabled, the avg/median review time cards and review response chart will be automatically hidden from the dashboard.
 
 **Performance Tip**: Increase `CACHE_DURATION_HOURS` to 12 or 24 for even better performance if you don't need real-time data.
 
