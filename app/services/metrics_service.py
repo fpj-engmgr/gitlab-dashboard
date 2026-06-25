@@ -269,15 +269,20 @@ class MetricsService:
         by_group = {}
 
         for mr in mrs:
-            # Get first comment on this MR (match GitLab IID, not auto-increment id)
+            # Get first comment on this MR (match both IID and project_id to avoid cross-project collisions)
             first_comment = self.db.query(Comment).filter(
-                Comment.mr_id == mr.iid
+                Comment.mr_id == mr.iid,
+                Comment.project_id == mr.project_id
             ).order_by(Comment.created_at.asc()).first()
 
             if first_comment and mr.created_at:
                 # Calculate hours from MR creation to first comment
                 time_diff = first_comment.created_at - mr.created_at
                 hours = time_diff.total_seconds() / 3600
+
+                # Skip negative values (indicates data inconsistency - comment before MR creation)
+                if hours < 0:
+                    continue
 
                 response_times.append(hours)
 
