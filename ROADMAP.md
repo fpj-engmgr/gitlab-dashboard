@@ -39,13 +39,14 @@ This document tracks planned features and improvements for the GitLab Metrics Da
 ## Quick Wins (Easy Implementation)
 
 ### ✅ Review Response Time Metrics
-**Priority:** High | **Effort:** Low | **Category:** Metrics | **Status:** Implemented
+**Priority:** High | **Effort:** Low | **Category:** Metrics | **Status:** Completed
 
 ~~Add metrics showing how quickly the team responds to merge requests:~~
 - ✅ Average time from MR creation to first comment/review
-- 📋 Median response time (less affected by outliers)
-- 📋 Response time by project/group
+- ✅ Median response time (less affected by outliers)
+- ✅ Response time by project/group
 - ✅ Add to metrics cards section
+- ✅ Review response time by group chart (bar chart visualization)
 
 **Value:** Identifies review bottlenecks, encourages faster feedback cycles
 
