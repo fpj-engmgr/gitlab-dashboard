@@ -608,7 +608,7 @@ class MetricsService:
             "total_contributors": total_contributors,
             "total_commits": 0,  # Not available for date-filtered view
             "total_mrs": total_mrs,
-            "total_comments": total_comments
+            "total_comments": total_comments,
             "top_contributors": [
                 {
                     "name": c["name"],
