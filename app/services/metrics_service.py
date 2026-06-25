@@ -262,7 +262,7 @@ class MetricsService:
     def _calculate_review_response_metrics(self, mrs: List[MergeRequest]) -> Dict[str, Any]:
         """Calculate detailed review response time metrics."""
         from app.models.schemas import Comment
-        from statistics import median
+        from statistics import median, quantiles
 
         response_times = []
         by_project = {}
@@ -299,26 +299,40 @@ class MetricsService:
                 by_group[group].append(hours)
 
         # Calculate aggregated metrics
-        avg_hours = sum(response_times) / len(response_times) if response_times else 0
-        median_hours = median(response_times) if response_times else 0
+        # Use 90th percentile instead of mean to avoid outlier skew
+        if response_times:
+            sorted_times = sorted(response_times)
+            p90_hours = quantiles(sorted_times, n=10)[8]  # 90th percentile (9th of 10 quantiles)
+            median_hours = median(sorted_times)
+        else:
+            p90_hours = 0
+            median_hours = 0
 
-        # Calculate averages by project
-        project_avgs = {
-            project: sum(times) / len(times)
-            for project, times in by_project.items()
-        }
+        # Calculate 90th percentile by project
+        project_p90 = {}
+        for project, times in by_project.items():
+            if len(times) >= 10:
+                # Use 90th percentile for projects with enough data
+                project_p90[project] = quantiles(sorted(times), n=10)[8]
+            else:
+                # Use max for small samples (approximation of upper bound)
+                project_p90[project] = max(times)
 
-        # Calculate averages by group
-        group_avgs = {
-            group: sum(times) / len(times)
-            for group, times in by_group.items()
-        }
+        # Calculate 90th percentile by group
+        group_p90 = {}
+        for group, times in by_group.items():
+            if len(times) >= 10:
+                # Use 90th percentile for groups with enough data
+                group_p90[group] = quantiles(sorted(times), n=10)[8]
+            else:
+                # Use max for small samples (approximation of upper bound)
+                group_p90[group] = max(times)
 
         return {
-            "avg_hours": avg_hours,
+            "avg_hours": p90_hours,  # Now using 90th percentile
             "median_hours": median_hours,
-            "by_project": project_avgs,
-            "by_group": group_avgs,
+            "by_project": project_p90,
+            "by_group": group_p90,
             "sample_size": len(response_times)
         }
 
