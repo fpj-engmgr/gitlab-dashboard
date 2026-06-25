@@ -478,39 +478,49 @@ class MetricsService:
         end_date: Optional[str] = None,
         group_id: Optional[str] = None
     ):
-        """Get comment/review metrics, optionally filtered by group."""
-        # In hybrid mode, we don't populate the comments table (too slow)
-        # Instead, derive totals from contributor comment_counts
+        """Get comment/review metrics, optionally filtered by group and date range."""
+        from datetime import datetime
 
-        if self.should_refresh_cache("contributors"):
-            self.refresh_contributors(days=days)
+        # Query comments from the database with date range filter
+        query = self.db.query(Comment)
 
-        # Build query with optional group filter
-        query = self.db.query(Contributor)
+        # Apply group filter if specified
         if group_id or self.group_id:
             filter_group = group_id or self.group_id
-            query = query.filter(Contributor.group_id == filter_group)
+            query = query.filter(Comment.group_id == filter_group)
 
-        contributors = query.all()
+        # Apply date range filter
+        if start_date and end_date:
+            start_dt = datetime.fromisoformat(start_date)
+            end_dt = datetime.fromisoformat(end_date)
+            query = query.filter(
+                Comment.created_at >= start_dt,
+                Comment.created_at <= end_dt
+            )
+        else:
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            query = query.filter(Comment.created_at >= cutoff_date)
 
-        # Aggregate from contributor stats
-        total_comments = sum(c.comment_count for c in contributors)
+        comments = query.all()
 
-        comments_by_author = {
-            c.username: c.comment_count
-            for c in contributors
-            if c.comment_count > 0
-        }
+        # Calculate total and aggregate by author
+        total_comments = len(comments)
 
-        # Note: We don't have by_day breakdown without fetching individual comments
-        # This is a trade-off for speed
+        comments_by_author = {}
+        for comment in comments:
+            if comment.author in comments_by_author:
+                comments_by_author[comment.author] += 1
+            else:
+                comments_by_author[comment.author] = 1
+
+        # Note: We don't have by_day breakdown for now
         comments_by_day = {}
 
         return {
             "total": total_comments,
             "by_author": comments_by_author,
             "by_day": comments_by_day,
-            "recent_comments": []  # Not available in hybrid mode (would be too slow)
+            "recent_comments": []  # Could be added later if needed
         }
 
     def _get_contributor_metrics_from_mrs(
