@@ -23,7 +23,25 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
     def get_team_members(self) -> List[str]:
-        """Load team member usernames from JSON file. Required for dashboard operation."""
+        """Load team member usernames from JSON file. Returns list of usernames for backward compatibility."""
+        members_data = self._load_team_members_data()
+        # Return just usernames for backward compatibility
+        if members_data and isinstance(members_data[0], dict):
+            return [m['username'] for m in members_data]
+        return members_data
+
+    def get_team_members_with_names(self) -> List[Dict[str, str]]:
+        """Load team members with both username and display name."""
+        members_data = self._load_team_members_data()
+
+        # Convert to dict format if using old string format
+        if members_data and isinstance(members_data[0], str):
+            return [{"username": username, "name": username} for username in members_data]
+
+        return members_data
+
+    def _load_team_members_data(self) -> List:
+        """Internal method to load raw team members data from JSON file."""
         team_file = Path(self.team_members_file)
         if not team_file.exists():
             raise FileNotFoundError(
@@ -40,6 +58,25 @@ class Settings(BaseSettings):
                     raise ValueError(
                         f"No team members found in {self.team_members_file}. "
                         f"Add GitLab usernames to the 'team_members' array."
+                    )
+
+                # Validate format
+                if isinstance(members[0], dict):
+                    # New format: list of objects with username and name
+                    for member in members:
+                        if 'username' not in member:
+                            raise ValueError(
+                                f"Team member missing 'username' field in {self.team_members_file}. "
+                                f"Each member must have: {{\"username\": \"...\", \"name\": \"...\"}}"
+                            )
+                        # Set name to username if not provided
+                        if 'name' not in member:
+                            member['name'] = member['username']
+                elif not isinstance(members[0], str):
+                    raise ValueError(
+                        f"Invalid team member format in {self.team_members_file}. "
+                        f"Use either [\"username1\", \"username2\"] or "
+                        f"[{{\"username\": \"user1\", \"name\": \"Name 1\"}}, ...]"
                     )
 
                 return members

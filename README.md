@@ -104,7 +104,29 @@ A web dashboard for monitoring GitLab metrics for your engineering team. Uses a 
    cp team_members.json.example team_members.json
    ```
    
-   Edit `team_members.json` and add your team's GitLab usernames:
+   Edit `team_members.json` and add your team's GitLab usernames and display names.
+   
+   **New format (recommended)** - with display names:
+   ```json
+   {
+     "team_members": [
+       {
+         "username": "jdoe",
+         "name": "John Doe"
+       },
+       {
+         "username": "asmith",
+         "name": "Alice Smith"
+       },
+       {
+         "username": "bwilliams",
+         "name": "Bob Williams"
+       }
+     ]
+   }
+   ```
+   
+   **Legacy format (still supported)** - usernames only:
    ```json
    {
      "team_members": [
@@ -115,7 +137,7 @@ A web dashboard for monitoring GitLab metrics for your engineering team. Uses a 
    }
    ```
    
-   **Important**: This file is required. The dashboard uses a team-member-first approach, querying GitLab for each person's contributions. This is much more efficient than scanning all projects, especially for large groups with hundreds of projects.
+   **Important**: This file is required. The dashboard uses a team-member-first approach, querying GitLab for each person's contributions. This is much more efficient than scanning all projects, especially for large groups with hundreds of projects. The new format allows you to display real names in the contributor table instead of just usernames.
 
 ## Getting a GitLab Personal Access Token
 
@@ -200,8 +222,25 @@ ENABLE_REVIEW_METRICS=True   # Enable review response metrics
 
 ### Team Member Configuration (Required)
 
-The dashboard uses a **team-member-first approach**. You must create a `team_members.json` file listing your team's GitLab usernames:
+The dashboard uses a **team-member-first approach**. You must create a `team_members.json` file listing your team's GitLab usernames.
 
+**Recommended format** (with display names):
+```json
+{
+  "team_members": [
+    {
+      "username": "jdoe",
+      "name": "John Doe"
+    },
+    {
+      "username": "asmith",
+      "name": "Alice Smith"
+    }
+  ]
+}
+```
+
+**Legacy format** (still supported):
 ```json
 {
   "team_members": [
@@ -216,11 +255,13 @@ The dashboard uses a **team-member-first approach**. You must create a `team_mem
 1. Dashboard loads the list of team members from this file
 2. For each team member, queries GitLab for their MRs and commits across the entire group
 3. Aggregates and displays metrics only for your team
+4. With the new format, displays real names in the contributor table instead of just usernames
 
 **Benefits:**
 - Much faster than scanning all projects (especially for groups with 100+ projects)
 - Only tracks your team's work, excluding external contributors and bots
 - Scales efficiently to large GitLab groups
+- Display friendly names in the dashboard while using GitLab usernames for API queries
 
 ## Performance Optimizations
 

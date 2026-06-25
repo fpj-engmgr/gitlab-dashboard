@@ -524,14 +524,18 @@ class MetricsService:
         contributor_map = {c["username"]: c for c in aggregated_contributors}
 
         # Return ALL team members, including those with 0 contributions
-        team_members = settings.get_team_members()
+        # Use get_team_members_with_names() to get display names
+        team_members = settings.get_team_members_with_names()
         all_contributors = []
 
-        for username in team_members:
+        for member in team_members:
+            username = member["username"]
+            display_name = member["name"]
+
             if username in contributor_map:
                 c = contributor_map[username]
                 all_contributors.append({
-                    "name": c["name"],
+                    "name": display_name,  # Use configured display name
                     "username": c["username"],
                     "commit_count": 0,  # Not available for date-filtered view
                     "mr_count": c["mr_count"],
@@ -541,7 +545,7 @@ class MetricsService:
             else:
                 # Team member with no activity in this date range
                 all_contributors.append({
-                    "name": username,
+                    "name": display_name,  # Use configured display name
                     "username": username,
                     "commit_count": 0,
                     "mr_count": 0,
@@ -626,15 +630,18 @@ class MetricsService:
         contributor_map = {c["username"]: c for c in aggregated_contributors}
 
         # Return ALL team members, including those with 0 contributions
-        team_members = settings.get_team_members()
+        team_members = settings.get_team_members_with_names()
         all_contributors = []
 
-        for username in team_members:
+        for member in team_members:
+            username = member["username"]
+            display_name = member["name"]
+
             if username in contributor_map:
                 # Existing contributor with data
                 c = contributor_map[username]
                 all_contributors.append({
-                    "name": c["name"],
+                    "name": display_name,  # Use configured display name
                     "username": c["username"],
                     "commit_count": c["commit_count"],
                     "mr_count": c["mr_count"],
@@ -644,7 +651,7 @@ class MetricsService:
             else:
                 # Team member with no activity
                 all_contributors.append({
-                    "name": username,
+                    "name": display_name,  # Use configured display name
                     "username": username,
                     "commit_count": 0,
                     "mr_count": 0,

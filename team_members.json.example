@@ -1,7 +1,16 @@
 {
   "team_members": [
-    "username1",
-    "username2",
-    "username3"
+    {
+      "username": "jdoe",
+      "name": "John Doe"
+    },
+    {
+      "username": "asmith",
+      "name": "Alice Smith"
+    },
+    {
+      "username": "bwilliams",
+      "name": "Bob Williams"
+    }
   ]
 }
