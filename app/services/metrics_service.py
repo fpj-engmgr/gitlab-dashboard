@@ -176,12 +176,16 @@ class MetricsService:
             if merged_mrs_with_time else 0
         )
 
+        # Calculate review response time (MR creation to first comment)
+        avg_review_response_hours = self._calculate_avg_review_response_time(mrs)
+
         result = {
             "total": total,
             "merged": merged,
             "open": open_mrs,
             "closed": closed,
             "avg_time_to_merge_hours": round(avg_time_to_merge, 2),
+            "avg_review_response_hours": round(avg_review_response_hours, 2),
             "merge_requests": [
                 {
                     "id": mr.id,
@@ -221,6 +225,27 @@ class MetricsService:
                 groups[gid]["closed"] += 1
 
         return groups
+
+    def _calculate_avg_review_response_time(self, mrs: List[MergeRequest]) -> float:
+        """Calculate average time from MR creation to first comment."""
+        from app.models.schemas import Comment
+
+        response_times = []
+
+        for mr in mrs:
+            # Get first comment on this MR
+            first_comment = self.db.query(Comment).filter(
+                Comment.mr_id == mr.id
+            ).order_by(Comment.created_at.asc()).first()
+
+            if first_comment and mr.created_at:
+                # Calculate hours from MR creation to first comment
+                time_diff = first_comment.created_at - mr.created_at
+                hours = time_diff.total_seconds() / 3600
+                response_times.append(hours)
+
+        # Return average, or 0 if no data
+        return sum(response_times) / len(response_times) if response_times else 0
 
     def get_commit_metrics(self, days: int = 30):
         """Get commit metrics - derived from contributor stats (hybrid approach)."""

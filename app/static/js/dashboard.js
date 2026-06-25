@@ -111,6 +111,7 @@ function updateMetricCards(mrData, commitData, contributorData, commentData) {
     document.getElementById('merged-mrs').textContent = mrData.merged;
     document.getElementById('open-mrs').textContent = mrData.open;
     document.getElementById('avg-merge-time').textContent = mrData.avg_time_to_merge_hours.toFixed(1);
+    document.getElementById('avg-review-response').textContent = mrData.avg_review_response_hours.toFixed(1);
     document.getElementById('total-contributors').textContent = contributorData.total_contributors;
     document.getElementById('total-comments').textContent = commentData.total;
 }
