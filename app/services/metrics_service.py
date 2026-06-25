@@ -199,14 +199,19 @@ class MetricsService:
             filter_group = group_id or self.group_id
             query = query.filter(MergeRequest.group_id == filter_group)
 
-        # Apply custom date range filter if provided
+        # Apply date range filter
         if start_date and end_date:
+            # Custom date range
             start_dt = datetime.fromisoformat(start_date)
             end_dt = datetime.fromisoformat(end_date)
             query = query.filter(
                 MergeRequest.created_at >= start_dt,
                 MergeRequest.created_at <= end_dt
             )
+        else:
+            # Days-based filter: show only MRs from the last N days
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            query = query.filter(MergeRequest.created_at >= cutoff_date)
 
         mrs = query.all()
 
