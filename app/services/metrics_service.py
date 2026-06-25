@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import Optional, Dict, Any, List
 from app.models.schemas import MergeRequest, Commit, Comment, Contributor, CacheMetadata
 from app.services.gitlab_client import GitLabClient
@@ -515,7 +516,7 @@ class MetricsService:
             "username": None,
             "mr_count": 0,
             "commit_count": 0,  # We don't have per-MR commit counts
-            "comment_count": 0,  # We don't have per-MR comment counts
+            "comment_count": 0,
             "last_activity": None
         })
 
@@ -531,6 +532,32 @@ class MetricsService:
             if mr.created_at:
                 if stats["last_activity"] is None or mr.created_at > stats["last_activity"]:
                     stats["last_activity"] = mr.created_at
+
+        # Query comment counts for contributors if comment details are available
+        from app.models.schemas import Comment
+        if settings.fetch_comment_details:
+            # Get all comments in the filtered date range
+            comment_query = self.db.query(Comment.author, func.count(Comment.id).label('count'))
+
+            if group_id or self.group_id:
+                filter_group = group_id or self.group_id
+                comment_query = comment_query.filter(Comment.group_id == filter_group)
+
+            if start_date and end_date:
+                comment_query = comment_query.filter(
+                    Comment.created_at >= start_dt,
+                    Comment.created_at <= end_dt
+                )
+            else:
+                cutoff_date = datetime.utcnow() - timedelta(days=days)
+                comment_query = comment_query.filter(Comment.created_at >= cutoff_date)
+
+            comment_counts = comment_query.group_by(Comment.author).all()
+
+            # Add comment counts to contributor stats
+            for author, count in comment_counts:
+                if author in contributor_stats:
+                    contributor_stats[author]["comment_count"] = count
 
         # Convert to list
         aggregated_contributors = list(contributor_stats.values())
@@ -574,11 +601,14 @@ class MetricsService:
         # Top contributors for chart (top 10 by MRs)
         top_10 = sorted(aggregated_contributors, key=lambda c: c["mr_count"], reverse=True)[:10]
 
+        # Calculate total comments from all contributors
+        total_comments = sum(c["comment_count"] for c in aggregated_contributors)
+
         return {
             "total_contributors": total_contributors,
             "total_commits": 0,  # Not available for date-filtered view
             "total_mrs": total_mrs,
-            "total_comments": 0,  # Not available for date-filtered view
+            "total_comments": total_comments
             "top_contributors": [
                 {
                     "name": c["name"],
