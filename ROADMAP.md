@@ -68,16 +68,19 @@ Highlight merge requests that need attention:
 
 ---
 
-### 📋 Custom Date Range Picker
-**Priority:** Medium | **Effort:** Low | **Category:** UX
+### ✅ Custom Date Range Picker
+**Priority:** Medium | **Effort:** Low | **Category:** UX | **Status:** Completed
 
-Replace fixed date options with flexible date picker:
-- Calendar-based date range selection
-- Quick presets (Last 7/14/30/60/90 days, This Month, Last Month, This Quarter)
-- Compare to previous period option
-- Persist selection in browser localStorage
+~~Replace fixed date options with flexible date picker:~~
+- ✅ Calendar-based custom date range selection (from/to dates)
+- ✅ Quick presets (Last 7/14/30/60/90 days, This Month, Last Month, This Quarter, Last Quarter)
+- ✅ Persist selection in browser localStorage
+- ✅ Auto-restore last selected range on page load
+- 📋 Compare to previous period option (future enhancement)
 
 **Value:** Enables specific reporting periods (e.g., "Q2 2026"), better for executive reports
+
+**Implementation:** Backend supports start_date/end_date parameters on all metric APIs. Frontend includes preset calculator and localStorage integration.
 
 ---
 
