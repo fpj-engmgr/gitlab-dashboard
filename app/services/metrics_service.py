@@ -374,6 +374,15 @@ class MetricsService:
                 logger.warning(f"Stale count mismatch! Old={stale_count}, New={actual_stale_count}")
                 logger.warning(f"First 5 stale MRs: {stale_mrs_debug[:5]}")
 
+            # Log ALL stale MR ages sorted
+            all_stale_ages = sorted([
+                round((datetime.utcnow() - datetime.fromisoformat(mr_dict['created_at'].replace('Z', '+00:00').replace('+00:00', ''))).total_seconds() / 86400, 3)
+                for mr_dict in result["merge_requests"]
+                if mr_dict["state"] == "opened"
+                and (datetime.utcnow() - datetime.fromisoformat(mr_dict['created_at'].replace('Z', '+00:00').replace('+00:00', ''))).total_seconds() / 86400 > settings.stale_mr_days
+            ], reverse=True)
+            logger.info(f"All {len(all_stale_ages)} stale MR ages: {all_stale_ages}")
+
             # Find MRs at the boundary (13.5 to 14.5 days)
             boundary_mrs = [
                 {'title': mr_dict['title'][:50], 'age': round((datetime.utcnow() - datetime.fromisoformat(mr_dict['created_at'].replace('Z', '+00:00').replace('+00:00', ''))).total_seconds() / 86400, 3)}
