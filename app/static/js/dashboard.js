@@ -765,6 +765,33 @@ function loadSavedDateRange() {
     }
 }
 
+function toggleExportMenu(e) {
+    e.stopPropagation();
+    const menu = document.getElementById('exportMenu');
+    menu.classList.toggle('show');
+}
+
+function exportData(type) {
+    const groupParam = currentGroup ? `&group_id=${currentGroup}` : '';
+
+    let dateParams = '';
+    if (currentStartDate && currentEndDate) {
+        const startDate = new Date(currentStartDate);
+        const now = new Date();
+        const daysFromStart = Math.max(1, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)) + 1);
+        dateParams = `days=${Math.floor(daysFromStart)}&start_date=${currentStartDate}&end_date=${currentEndDate}`;
+    } else {
+        const validDays = (currentDays && !isNaN(currentDays)) ? currentDays : 30;
+        dateParams = `days=${validDays}`;
+    }
+
+    const url = `/api/export/${type}?${dateParams}${groupParam}`;
+    window.location.href = url;
+
+    // Close the menu
+    document.getElementById('exportMenu').classList.remove('show');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     loadGroups();  // Load and populate group selector
     loadSavedDateRange();  // Load saved date range preference
@@ -774,6 +801,32 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('applyCustomRange').addEventListener('click', applyCustomDateRange);
     document.getElementById('groupFilter').addEventListener('change', changeGroup);
     document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
+
+    // Export dropdown
+    document.getElementById('exportBtn').addEventListener('click', toggleExportMenu);
+    document.getElementById('exportSummary').addEventListener('click', (e) => {
+        e.preventDefault();
+        exportData('summary');
+    });
+    document.getElementById('exportContributors').addEventListener('click', (e) => {
+        e.preventDefault();
+        exportData('contributors');
+    });
+    document.getElementById('exportMRs').addEventListener('click', (e) => {
+        e.preventDefault();
+        exportData('merge-requests');
+    });
+    document.getElementById('exportStaleMRs').addEventListener('click', (e) => {
+        e.preventDefault();
+        exportData('stale-mrs');
+    });
+
+    // Close export menu when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.export-dropdown')) {
+            document.getElementById('exportMenu').classList.remove('show');
+        }
+    });
 
     // Add click handlers for contributor table sortable headers
     const contributorTable = document.querySelector('#contributorTableBody').closest('table');

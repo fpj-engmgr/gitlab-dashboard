@@ -448,6 +448,66 @@ a:hover {
     font-size: 0.95em;
 }
 
+/* Export dropdown */
+.export-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.export-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    font-size: 1em;
+    cursor: pointer;
+    font-weight: 600;
+    transition: transform 0.2s;
+}
+
+.export-btn:hover {
+    transform: translateY(-2px);
+}
+
+.export-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--card-bg);
+    min-width: 200px;
+    box-shadow: 0 4px 12px var(--shadow-color);
+    border-radius: 4px;
+    margin-top: 5px;
+    z-index: 1000;
+    border: 1px solid var(--border-color);
+}
+
+.export-menu.show {
+    display: block;
+}
+
+.export-menu a {
+    display: block;
+    padding: 12px 20px;
+    color: var(--card-text);
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.export-menu a:hover {
+    background: var(--table-hover);
+}
+
+.export-menu a:first-child {
+    border-radius: 4px 4px 0 0;
+}
+
+.export-menu a:last-child {
+    border-radius: 0 0 4px 4px;
+}
+
 /* Dark mode toggle button */
 .theme-toggle {
     margin-left: auto;
