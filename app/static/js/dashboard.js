@@ -62,7 +62,7 @@ async function fetchMetrics() {
             console.log('Fetching metrics with days:', validDays, 'group:', currentGroup);
         }
 
-        const [mrData, commitData, contributorData, commentData] = await Promise.all([
+        const [mrData, commitData, contributorData, commentData, comparisonData] = await Promise.all([
             fetch(`/api/metrics/merge-requests?${dateParams}${groupParam}`).then(r => {
                 if (!r.ok) throw new Error(`MR endpoint failed: ${r.status}`);
                 return r.json();
@@ -78,12 +78,16 @@ async function fetchMetrics() {
             fetch(`/api/metrics/comments?${dateParams}${groupParam}`).then(r => {
                 if (!r.ok) throw new Error(`Comments endpoint failed: ${r.status}`);
                 return r.json();
+            }),
+            fetch(`/api/metrics/comparison?${dateParams}${groupParam}`).then(r => {
+                if (!r.ok) throw new Error(`Comparison endpoint failed: ${r.status}`);
+                return r.json();
             })
         ]);
 
-        console.log('Data fetched successfully:', {mrData, commitData, contributorData, commentData});
+        console.log('Data fetched successfully:', {mrData, commitData, contributorData, commentData, comparisonData});
 
-        updateMetricCards(mrData, commitData, contributorData, commentData);
+        updateMetricCards(mrData, commitData, contributorData, commentData, comparisonData);
         updateCharts(mrData, contributorData);
         updateTables(mrData, contributorData);
 
@@ -122,7 +126,7 @@ function showError(message) {
     container.insertBefore(errorDiv, container.firstChild);
 }
 
-function updateMetricCards(mrData, commitData, contributorData, commentData) {
+function updateMetricCards(mrData, commitData, contributorData, commentData, comparisonData = {}) {
     document.getElementById('total-mrs').textContent = mrData.total;
     document.getElementById('merged-mrs').textContent = mrData.merged;
     document.getElementById('open-mrs').textContent = mrData.open;
@@ -160,6 +164,43 @@ function updateMetricCards(mrData, commitData, contributorData, commentData) {
 
     document.getElementById('total-contributors').textContent = contributorData.total_contributors;
     document.getElementById('total-comments').textContent = commentData.total;
+
+    // Update comparison indicators
+    updateComparison('total-mrs-comparison', comparisonData.total_mrs);
+    updateComparison('merged-mrs-comparison', comparisonData.merged_mrs);
+    updateComparison('open-mrs-comparison', comparisonData.open_mrs);
+    updateComparison('avg-merge-time-comparison', comparisonData.avg_time_to_merge, true); // true = inverse (lower is better)
+    updateComparison('median-merge-time-comparison', comparisonData.median_time_to_merge, true);
+    updateComparison('stale-mrs-comparison', comparisonData.stale_mrs, true); // inverse (lower is better)
+    updateComparison('total-contributors-comparison', comparisonData.total_contributors);
+    updateComparison('total-comments-comparison', comparisonData.total_comments);
+}
+
+function updateComparison(elementId, changePercent, inverse = false) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+
+    if (changePercent === undefined || changePercent === null || isNaN(changePercent)) {
+        element.textContent = '';
+        element.className = 'comparison';
+        return;
+    }
+
+    const absChange = Math.abs(changePercent);
+    const arrow = changePercent > 0 ? '↑' : changePercent < 0 ? '↓' : '→';
+    element.textContent = `${arrow} ${absChange}%`;
+
+    // Determine class based on change and whether lower is better
+    element.className = 'comparison';
+    if (changePercent === 0) {
+        element.classList.add('neutral');
+    } else if (inverse) {
+        // For metrics where lower is better (merge time, stale MRs)
+        element.classList.add(changePercent > 0 ? 'positive-inverse' : 'negative-inverse');
+    } else {
+        // For metrics where higher is better (total MRs, merged, contributors)
+        element.classList.add(changePercent > 0 ? 'positive' : 'negative');
+    }
 }
 
 function updateCharts(mrData, contributorData) {

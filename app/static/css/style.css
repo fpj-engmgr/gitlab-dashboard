@@ -165,6 +165,53 @@ body.dark-mode .metric-card.warning {
     font-size: 0.85em;
 }
 
+.metric-card .comparison {
+    font-size: 0.9em;
+    font-weight: 600;
+    margin-top: 4px;
+    min-height: 20px;
+}
+
+.metric-card .comparison.positive {
+    color: #2ecc71;
+}
+
+.metric-card .comparison.negative {
+    color: #e74c3c;
+}
+
+.metric-card .comparison.neutral {
+    color: #95a5a6;
+}
+
+.metric-card .comparison.positive-inverse {
+    color: #e74c3c;  /* Red for increases in "bad" metrics like stale MRs */
+}
+
+.metric-card .comparison.negative-inverse {
+    color: #2ecc71;  /* Green for decreases in "bad" metrics */
+}
+
+body.dark-mode .metric-card .comparison.positive {
+    color: #27ae60;
+}
+
+body.dark-mode .metric-card .comparison.negative {
+    color: #c0392b;
+}
+
+body.dark-mode .metric-card .comparison.neutral {
+    color: #7f8c8d;
+}
+
+body.dark-mode .metric-card .comparison.positive-inverse {
+    color: #c0392b;
+}
+
+body.dark-mode .metric-card .comparison.negative-inverse {
+    color: #27ae60;
+}
+
 .loading {
     color: #999;
     font-style: italic;

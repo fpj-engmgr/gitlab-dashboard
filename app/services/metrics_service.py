@@ -407,6 +407,87 @@ class MetricsService:
 
         return result
 
+    def get_comparison_metrics(
+        self,
+        days: int = 30,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        group_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Calculate metrics for the previous period (same duration) for comparison.
+        Returns percentage changes for key metrics.
+        """
+        # Calculate previous period dates
+        if start_date and end_date:
+            # Custom date range - calculate previous period of same duration
+            start_dt = datetime.fromisoformat(start_date)
+            end_dt = datetime.fromisoformat(end_date)
+            duration = (end_dt - start_dt).days
+
+            prev_end_dt = start_dt - timedelta(days=1)
+            prev_start_dt = prev_end_dt - timedelta(days=duration)
+
+            prev_start = prev_start_dt.isoformat()
+            prev_end = prev_end_dt.isoformat()
+            prev_days = duration + 1
+        else:
+            # Days-based - just double the days to get previous period
+            prev_days = days
+            prev_start = None
+            prev_end = None
+
+        # Get current period metrics
+        current = self.get_merge_request_metrics(days=days, start_date=start_date, end_date=end_date, group_id=group_id)
+        current_contributors = self.get_contributor_metrics(days=days, start_date=start_date, end_date=end_date, group_id=group_id)
+        current_comments = self.get_comment_metrics(days=days, start_date=start_date, end_date=end_date, group_id=group_id)
+
+        # Get previous period metrics
+        if prev_start and prev_end:
+            prev = self.get_merge_request_metrics(days=prev_days, start_date=prev_start, end_date=prev_end, group_id=group_id)
+            prev_contributors = self.get_contributor_metrics(days=prev_days, start_date=prev_start, end_date=prev_end, group_id=group_id)
+            prev_comments = self.get_comment_metrics(days=prev_days, start_date=prev_start, end_date=prev_end, group_id=group_id)
+        else:
+            # For days-based, get MRs from the previous equivalent period
+            cutoff_start = datetime.utcnow() - timedelta(days=days * 2)
+            cutoff_end = datetime.utcnow() - timedelta(days=days)
+            prev = self.get_merge_request_metrics(
+                days=days * 2,
+                start_date=cutoff_start.isoformat(),
+                end_date=cutoff_end.isoformat(),
+                group_id=group_id
+            )
+            prev_contributors = self.get_contributor_metrics(
+                days=days * 2,
+                start_date=cutoff_start.isoformat(),
+                end_date=cutoff_end.isoformat(),
+                group_id=group_id
+            )
+            prev_comments = self.get_comment_metrics(
+                days=days * 2,
+                start_date=cutoff_start.isoformat(),
+                end_date=cutoff_end.isoformat(),
+                group_id=group_id
+            )
+
+        # Calculate percentage changes
+        def calc_change(current_val, prev_val):
+            """Calculate percentage change, handling zero division."""
+            if prev_val == 0:
+                return 100.0 if current_val > 0 else 0.0
+            return round(((current_val - prev_val) / prev_val) * 100, 1)
+
+        return {
+            "total_mrs": calc_change(current["total"], prev["total"]),
+            "merged_mrs": calc_change(current["merged"], prev["merged"]),
+            "open_mrs": calc_change(current["open"], prev["open"]),
+            "avg_time_to_merge": calc_change(current["avg_time_to_merge_hours"], prev["avg_time_to_merge_hours"]),
+            "median_time_to_merge": calc_change(current["median_time_to_merge_hours"], prev["median_time_to_merge_hours"]),
+            "stale_mrs": calc_change(current["stale"], prev["stale"]),
+            "total_contributors": calc_change(current_contributors["total_contributors"], prev_contributors["total_contributors"]),
+            "total_comments": calc_change(current_comments["total"], prev_comments["total"]),
+        }
+
     def _get_group_breakdown(self, mrs: List[MergeRequest]) -> Dict[str, Any]:
         """Calculate per-group metrics."""
         groups = {}

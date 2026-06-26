@@ -99,6 +99,24 @@ async def get_comment_metrics(
     )
 
 
+@router.get("/api/metrics/comparison")
+async def get_comparison_metrics(
+    days: int = 30,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    group_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get comparison metrics vs previous period."""
+    service = MetricsService(db, group_id=group_id)
+    return service.get_comparison_metrics(
+        days=days,
+        start_date=start_date,
+        end_date=end_date,
+        group_id=group_id
+    )
+
+
 @router.post("/api/refresh")
 async def refresh_all_metrics(days: int = 30, background_tasks: BackgroundTasks = None, db: Session = Depends(get_db)):
     """Force refresh all metrics from GitLab (Phase 1 - fast, MRs only)."""
