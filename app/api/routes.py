@@ -137,6 +137,24 @@ async def get_trend_metrics(
     )
 
 
+@router.get("/api/metrics/size-distribution")
+async def get_size_distribution_metrics(
+    days: int = 30,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    group_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get MR size distribution and correlation with time-to-merge."""
+    service = MetricsService(db, group_id=group_id)
+    return service.get_size_distribution_metrics(
+        days=days,
+        start_date=start_date,
+        end_date=end_date,
+        group_id=group_id
+    )
+
+
 @router.post("/api/refresh")
 async def refresh_all_metrics(days: int = 30, background_tasks: BackgroundTasks = None, db: Session = Depends(get_db)):
     """Force refresh all metrics from GitLab (Phase 1 - fast, MRs only)."""

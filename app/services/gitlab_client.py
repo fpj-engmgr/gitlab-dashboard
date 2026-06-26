@@ -48,6 +48,13 @@ class GitLabClient:
 
             for mr in group_mrs:
                 try:
+                    # Get change statistics (additions/deletions)
+                    lines_added = getattr(mr, 'additions', None)
+                    lines_deleted = getattr(mr, 'deletions', None)
+                    lines_changed = None
+                    if lines_added is not None and lines_deleted is not None:
+                        lines_changed = lines_added + lines_deleted
+
                     mr_data = {
                         'group_id': self.group_id,  # Multi-group support
                         'project_id': mr.project_id,
@@ -63,6 +70,9 @@ class GitLabClient:
                         'source_branch': mr.source_branch,
                         'target_branch': mr.target_branch,
                         'web_url': mr.web_url,
+                        'lines_added': lines_added,
+                        'lines_deleted': lines_deleted,
+                        'lines_changed': lines_changed,
                     }
 
                     if mr_data['merged_at'] and mr_data['created_at']:

@@ -171,6 +171,34 @@
                     <canvas id="mrVelocityChart"></canvas>
                 </div>
             </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h2>MR Size Distribution</h2>
+                    <div class="chart-container small">
+                        <canvas id="mrSizeDistributionChart"></canvas>
+                    </div>
+                    <div class="size-legend">
+                        <div class="size-category">
+                            <span class="size-label">Small:</span> &lt; 100 lines
+                        </div>
+                        <div class="size-category">
+                            <span class="size-label">Medium:</span> 100-500 lines
+                        </div>
+                        <div class="size-category">
+                            <span class="size-label">Large:</span> &gt; 500 lines
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h2>Avg Time-to-Merge by Size</h2>
+                    <div class="chart-container small">
+                        <canvas id="sizeVsTimeChart"></canvas>
+                    </div>
+                    <p class="chart-insight" id="sizeInsight">Loading...</p>
+                </div>
+            </div>
         </div>
         <!-- End Tab: Trends -->
 

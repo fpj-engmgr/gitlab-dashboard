@@ -1082,8 +1082,10 @@ function switchTab(tabName) {
     }
 }
 
-// Trend Analysis Chart
+// Trend Analysis Charts
 let mrVelocityChart = null;
+let mrSizeDistributionChart = null;
+let sizeVsTimeChart = null;
 let currentTrendPeriod = 'week';
 
 async function loadTrends() {
@@ -1100,11 +1102,18 @@ async function loadTrends() {
             dateParams = `days=${validDays}`;
         }
 
-        const response = await fetch(`/api/metrics/trends?${dateParams}${groupParam}&period=${currentTrendPeriod}`);
-        if (!response.ok) throw new Error(`Trends endpoint failed: ${response.status}`);
+        // Load velocity trends
+        const trendsResponse = await fetch(`/api/metrics/trends?${dateParams}${groupParam}&period=${currentTrendPeriod}`);
+        if (!trendsResponse.ok) throw new Error(`Trends endpoint failed: ${trendsResponse.status}`);
+        const trendsData = await trendsResponse.json();
+        updateMRVelocityChart(trendsData);
 
-        const data = await response.json();
-        updateMRVelocityChart(data);
+        // Load size distribution
+        const sizeResponse = await fetch(`/api/metrics/size-distribution?${dateParams}${groupParam}`);
+        if (!sizeResponse.ok) throw new Error(`Size distribution endpoint failed: ${sizeResponse.status}`);
+        const sizeData = await sizeResponse.json();
+        updateSizeDistributionCharts(sizeData);
+
         window.trendsLoaded = true;
     } catch (error) {
         console.error('Error loading trends:', error);
@@ -1173,3 +1182,137 @@ function updateMRVelocityChart(data) {
     });
 }
 
+
+function updateSizeDistributionCharts(data) {
+    const isDarkMode = document.body.classList.contains('dark-mode');
+    const textColor = isDarkMode ? '#e0e0e0' : '#333';
+    const gridColor = isDarkMode ? '#2a2a3e' : '#e9ecef';
+
+    // Size Distribution Pie Chart
+    const distCtx = document.getElementById('mrSizeDistributionChart').getContext('2d');
+
+    if (mrSizeDistributionChart) {
+        mrSizeDistributionChart.destroy();
+    }
+
+    mrSizeDistributionChart = new Chart(distCtx, {
+        type: 'pie',
+        data: {
+            labels: ['Small (< 100)', 'Medium (100-500)', 'Large (> 500)'],
+            datasets: [{
+                data: [data.small.count, data.medium.count, data.large.count],
+                backgroundColor: [
+                    '#2ecc71',  // Green for small
+                    '#f39c12',  // Orange for medium
+                    '#e74c3c'   // Red for large
+                ],
+                borderWidth: 2,
+                borderColor: isDarkMode ? '#1e1e2e' : '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: { color: textColor }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const percentage = data.total_mrs > 0 ?
+                                Math.round((value / data.total_mrs) * 100) : 0;
+                            return `${label}: ${value} MRs (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Size vs Time-to-Merge Bar Chart
+    const timeCtx = document.getElementById('sizeVsTimeChart').getContext('2d');
+
+    if (sizeVsTimeChart) {
+        sizeVsTimeChart.destroy();
+    }
+
+    sizeVsTimeChart = new Chart(timeCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Small', 'Medium', 'Large'],
+            datasets: [{
+                label: 'Avg Hours to Merge',
+                data: [
+                    data.small.avg_time_to_merge,
+                    data.medium.avg_time_to_merge,
+                    data.large.avg_time_to_merge
+                ],
+                backgroundColor: [
+                    'rgba(46, 204, 113, 0.7)',
+                    'rgba(243, 156, 18, 0.7)',
+                    'rgba(231, 76, 60, 0.7)'
+                ],
+                borderColor: [
+                    '#2ecc71',
+                    '#f39c12',
+                    '#e74c3c'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.parsed.y.toFixed(1)} hours`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: textColor },
+                    grid: { color: gridColor },
+                    title: {
+                        display: true,
+                        text: 'Hours',
+                        color: textColor
+                    }
+                },
+                x: {
+                    ticks: { color: textColor },
+                    grid: { color: gridColor }
+                }
+            }
+        }
+    });
+
+    // Generate insight
+    const insightEl = document.getElementById('sizeInsight');
+    if (data.total_mrs === 0) {
+        insightEl.textContent = 'No MR size data available. Refresh data to populate.';
+    } else {
+        const largePercent = data.large.percentage;
+        const timeDiff = data.large.avg_time_to_merge - data.small.avg_time_to_merge;
+
+        if (largePercent > 30) {
+            insightEl.textContent = `⚠️ ${largePercent}% of MRs are large. Consider smaller, incremental changes for faster reviews.`;
+        } else if (timeDiff > 50) {
+            insightEl.textContent = `Large MRs take ${timeDiff.toFixed(0)} hours longer to merge than small ones. Smaller MRs = faster feedback!`;
+        } else {
+            insightEl.textContent = `✅ Good balance! ${data.small.percentage}% small MRs with consistent merge times.`;
+        }
+    }
+}

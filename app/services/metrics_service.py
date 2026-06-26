@@ -1136,3 +1136,90 @@ class MetricsService:
             "merged": merged_counts,
             "period": "month"
         }
+
+    def get_size_distribution_metrics(
+        self,
+        days: int = 30,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        group_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get MR size distribution and correlation with time-to-merge.
+
+        Size categories:
+        - Small: < 100 lines changed
+        - Medium: 100-500 lines changed
+        - Large: > 500 lines changed
+
+        Returns distribution, avg time-to-merge per category, and avg comments per category.
+        """
+        # Build query
+        query = self.db.query(MergeRequest)
+
+        if group_id:
+            query = query.filter(MergeRequest.group_id == group_id)
+
+        # Apply date range filter
+        if start_date and end_date:
+            start_dt = datetime.fromisoformat(start_date)
+            end_dt = datetime.fromisoformat(end_date)
+            query = query.filter(
+                MergeRequest.created_at >= start_dt,
+                MergeRequest.created_at <= end_dt
+            )
+        else:
+            cutoff = datetime.utcnow() - timedelta(days=days)
+            query = query.filter(MergeRequest.created_at >= cutoff)
+
+        # Only include MRs with size data
+        mrs = query.filter(MergeRequest.lines_changed.isnot(None)).all()
+
+        if not mrs:
+            return {
+                "total_mrs": 0,
+                "small": {"count": 0, "avg_time_to_merge": 0, "percentage": 0},
+                "medium": {"count": 0, "avg_time_to_merge": 0, "percentage": 0},
+                "large": {"count": 0, "avg_time_to_merge": 0, "percentage": 0},
+            }
+
+        # Categorize MRs
+        small_mrs = []
+        medium_mrs = []
+        large_mrs = []
+
+        for mr in mrs:
+            if mr.lines_changed < 100:
+                small_mrs.append(mr)
+            elif mr.lines_changed <= 500:
+                medium_mrs.append(mr)
+            else:
+                large_mrs.append(mr)
+
+        total = len(mrs)
+
+        # Calculate average time-to-merge for each category (only merged MRs)
+        def avg_time_to_merge(category_mrs):
+            merged = [mr for mr in category_mrs if mr.state == 'merged' and mr.time_to_merge_hours]
+            if not merged:
+                return 0
+            return round(sum(mr.time_to_merge_hours for mr in merged) / len(merged), 1)
+
+        return {
+            "total_mrs": total,
+            "small": {
+                "count": len(small_mrs),
+                "avg_time_to_merge": avg_time_to_merge(small_mrs),
+                "percentage": round((len(small_mrs) / total) * 100, 1) if total > 0 else 0
+            },
+            "medium": {
+                "count": len(medium_mrs),
+                "avg_time_to_merge": avg_time_to_merge(medium_mrs),
+                "percentage": round((len(medium_mrs) / total) * 100, 1) if total > 0 else 0
+            },
+            "large": {
+                "count": len(large_mrs),
+                "avg_time_to_merge": avg_time_to_merge(large_mrs),
+                "percentage": round((len(large_mrs) / total) * 100, 1) if total > 0 else 0
+            },
+        }

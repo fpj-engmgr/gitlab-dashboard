@@ -22,6 +22,9 @@ class MergeRequest(Base):
     source_branch = Column(String)
     target_branch = Column(String)
     web_url = Column(String)
+    lines_added = Column(Integer, nullable=True)
+    lines_deleted = Column(Integer, nullable=True)
+    lines_changed = Column(Integer, nullable=True)  # Total: additions + deletions
 
 
 class Commit(Base):

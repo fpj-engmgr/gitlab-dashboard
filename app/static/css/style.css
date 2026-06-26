@@ -181,6 +181,34 @@ body.dark-mode .tab-button.active {
     cursor: pointer;
 }
 
+.size-legend {
+    margin-top: 15px;
+    padding: 10px;
+    background: var(--table-hover);
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.size-category {
+    margin: 5px 0;
+}
+
+.size-label {
+    font-weight: 600;
+    color: var(--card-text);
+}
+
+.chart-insight {
+    margin-top: 15px;
+    padding: 12px;
+    background: var(--table-hover);
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--card-subtext);
+    text-align: center;
+    font-style: italic;
+}
+
 .metrics-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
