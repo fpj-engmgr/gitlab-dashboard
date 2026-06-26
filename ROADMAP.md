@@ -35,6 +35,8 @@ This document tracks planned features and improvements for the GitLab Metrics Da
 - [x] Configurable server port (PORT in .env, defaults to 8000)
 - [x] STALE_MR_DAYS configurable (default changed from 7 to 14 days)
 - [x] Historical comparison with calendar-aware logic (month-to-month, quarter-to-quarter)
+- [x] Tabbed navigation (Overview, Trends, Contributors, Merge Requests)
+- [x] Trend analysis charts with weekly/monthly toggle
 
 ---
 
@@ -134,16 +136,19 @@ Currently shows `0` in hybrid mode where comments table is not fully populated.
 
 ## Medium Effort, High Value
 
-### 📋 Trend Analysis Charts
-**Priority:** High | **Effort:** Medium | **Category:** Visualization
+### ✅ Trend Analysis Charts
+**Priority:** High | **Effort:** Medium | **Category:** Visualization | **Status:** Completed
 
-Add time-series visualizations:
-- MR velocity over time (line chart: MRs created/merged per week)
-- Week-over-week comparison
-- Month-over-month trends
-- Rolling averages to smooth noise
+~~Add time-series visualizations:~~
+- ✅ MR velocity over time (line chart: MRs created/merged per period)
+- ✅ Toggle between weekly and monthly views
+- ✅ Respects date range and group filters
+- ✅ Dedicated "Trends" tab in dashboard
+- 📋 Rolling averages to smooth noise (future enhancement)
 
 **Value:** Shows team productivity trends, helps predict capacity
+
+**Implementation:** New `/api/metrics/trends` endpoint with weekly/monthly bucketing logic. Line chart shows MRs Created vs Merged over time. Weekly view buckets by Monday-start weeks, monthly by calendar months. Lazy-loaded when Trends tab is opened.
 
 ---
 
@@ -479,9 +484,10 @@ Features will be grouped into releases:
 - ✅ Dark mode
 - ✅ Configurable port
 - ✅ Custom date ranges
+- ✅ Tabbed navigation
+- ✅ Trend analysis charts
 
 **v1.2** (Future)
-- Trend analysis charts
 - MR size distribution
 - Health score per group
 
@@ -492,4 +498,4 @@ Features will be grouped into releases:
 
 ---
 
-*Last Updated: 2026-06-26 (Evening)*
+*Last Updated: 2026-06-26 (Late Evening)*
