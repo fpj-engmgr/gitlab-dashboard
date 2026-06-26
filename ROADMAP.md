@@ -34,7 +34,7 @@ This document tracks planned features and improvements for the GitLab Metrics Da
 - [x] CSV export (dropdown menu with 4 export types)
 - [x] Configurable server port (PORT in .env, defaults to 8000)
 - [x] STALE_MR_DAYS configurable (default changed from 7 to 14 days)
-- [x] Historical comparison with percentage changes and arrow indicators
+- [x] Historical comparison with calendar-aware logic (month-to-month, quarter-to-quarter)
 
 ---
 
@@ -246,13 +246,16 @@ Sprint/iteration view for agile teams:
 ~~Compare current period to previous periods:~~
 - ✅ Show percentage change for all metrics
 - ✅ Arrow indicators (↑/↓/→) with smart color coding
-- ✅ Automatic comparison to previous period (same duration)
+- ✅ **Calendar-aware comparison logic**:
+  - Full month (June 2026) → compares to previous full month (May 2026)
+  - Full quarter (Q1 2026) → compares to previous quarter (Q4 2025)
+  - Custom ranges → same-duration comparison
 - ✅ Inverse coloring for "bad" metrics (↑ stale MRs = red, ↓ = green)
 - ✅ Dark mode support
 
-**Value:** Quickly spot trends, identify improvements or regressions
+**Value:** Quickly spot trends, identify improvements or regressions with meaningful period-to-period comparisons
 
-**Implementation:** New `/api/metrics/comparison` endpoint calculates previous period metrics and percentage changes. Frontend displays arrows with color-coded indicators on all metric cards. Green = good (↑ MRs), Red = bad (↑ merge time), with inverse logic for metrics where lower is better.
+**Implementation:** New `/api/metrics/comparison` endpoint with smart period detection. Detects full months (starts day 1, 28-31 days), full quarters (starts Q1/Q2/Q3/Q4, 90-92 days), and automatically compares to the equivalent previous period. Handles year boundaries, different month lengths, and leap years. Frontend displays arrows with color-coded indicators on all metric cards.
 
 ---
 
