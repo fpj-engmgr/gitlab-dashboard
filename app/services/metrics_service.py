@@ -988,3 +988,151 @@ class MetricsService:
             ],
             "all_contributors": all_contributors
         }
+
+    def get_trend_metrics(
+        self,
+        days: int = 90,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        group_id: Optional[str] = None,
+        period: str = 'week'
+    ) -> Dict[str, Any]:
+        """
+        Get trend analysis data (MR velocity over time).
+
+        Args:
+            days: Number of days to look back (default 90 for trends)
+            start_date: Optional custom start date
+            end_date: Optional custom end date
+            group_id: Optional group filter
+            period: 'week' or 'month' for bucketing
+
+        Returns:
+            Dict with labels, created counts, and merged counts per period
+        """
+        # Build query
+        query = self.db.query(MergeRequest)
+
+        if group_id:
+            query = query.filter(MergeRequest.group_id == group_id)
+
+        # Apply date range filter
+        if start_date and end_date:
+            start_dt = datetime.fromisoformat(start_date)
+            end_dt = datetime.fromisoformat(end_date)
+            query = query.filter(
+                MergeRequest.created_at >= start_dt,
+                MergeRequest.created_at <= end_dt
+            )
+        else:
+            cutoff = datetime.utcnow() - timedelta(days=days)
+            query = query.filter(MergeRequest.created_at >= cutoff)
+
+        mrs = query.all()
+
+        # Bucket MRs by period
+        if period == 'month':
+            buckets = self._bucket_by_month(mrs, start_date, end_date, days)
+        else:  # week
+            buckets = self._bucket_by_week(mrs, start_date, end_date, days)
+
+        return buckets
+
+    def _bucket_by_week(self, mrs: List[MergeRequest], start_date: Optional[str], end_date: Optional[str], days: int) -> Dict[str, Any]:
+        """Bucket MRs by week."""
+        from collections import defaultdict
+
+        # Determine date range
+        if start_date and end_date:
+            end_dt = datetime.fromisoformat(end_date)
+            start_dt = datetime.fromisoformat(start_date)
+        else:
+            end_dt = datetime.utcnow()
+            start_dt = end_dt - timedelta(days=days)
+
+        # Create weekly buckets
+        created_by_week = defaultdict(int)
+        merged_by_week = defaultdict(int)
+
+        for mr in mrs:
+            # Get week start (Monday) for created_at
+            created_week_start = mr.created_at - timedelta(days=mr.created_at.weekday())
+            week_key = created_week_start.strftime('%Y-%m-%d')
+            created_by_week[week_key] += 1
+
+            # Count merged in the week it was merged
+            if mr.state == 'merged' and mr.merged_at:
+                merged_week_start = mr.merged_at - timedelta(days=mr.merged_at.weekday())
+                merged_week_key = merged_week_start.strftime('%Y-%m-%d')
+                merged_by_week[merged_week_key] += 1
+
+        # Generate all weeks in range
+        labels = []
+        created_counts = []
+        merged_counts = []
+
+        current = start_dt - timedelta(days=start_dt.weekday())  # Start on Monday
+        while current <= end_dt:
+            week_key = current.strftime('%Y-%m-%d')
+            labels.append(current.strftime('%b %d'))  # e.g., "Jun 01"
+            created_counts.append(created_by_week.get(week_key, 0))
+            merged_counts.append(merged_by_week.get(week_key, 0))
+            current += timedelta(weeks=1)
+
+        return {
+            "labels": labels,
+            "created": created_counts,
+            "merged": merged_counts,
+            "period": "week"
+        }
+
+    def _bucket_by_month(self, mrs: List[MergeRequest], start_date: Optional[str], end_date: Optional[str], days: int) -> Dict[str, Any]:
+        """Bucket MRs by month."""
+        from collections import defaultdict
+
+        # Determine date range
+        if start_date and end_date:
+            end_dt = datetime.fromisoformat(end_date)
+            start_dt = datetime.fromisoformat(start_date)
+        else:
+            end_dt = datetime.utcnow()
+            start_dt = end_dt - timedelta(days=days)
+
+        # Create monthly buckets
+        created_by_month = defaultdict(int)
+        merged_by_month = defaultdict(int)
+
+        for mr in mrs:
+            # Get month start for created_at
+            month_key = mr.created_at.strftime('%Y-%m')
+            created_by_month[month_key] += 1
+
+            # Count merged in the month it was merged
+            if mr.state == 'merged' and mr.merged_at:
+                merged_month_key = mr.merged_at.strftime('%Y-%m')
+                merged_by_month[merged_month_key] += 1
+
+        # Generate all months in range
+        labels = []
+        created_counts = []
+        merged_counts = []
+
+        current = start_dt.replace(day=1)  # Start on 1st of month
+        while current <= end_dt:
+            month_key = current.strftime('%Y-%m')
+            labels.append(current.strftime('%b %Y'))  # e.g., "Jun 2026"
+            created_counts.append(created_by_month.get(month_key, 0))
+            merged_counts.append(merged_by_month.get(month_key, 0))
+
+            # Move to next month
+            if current.month == 12:
+                current = current.replace(year=current.year + 1, month=1)
+            else:
+                current = current.replace(month=current.month + 1)
+
+        return {
+            "labels": labels,
+            "created": created_counts,
+            "merged": merged_counts,
+            "period": "month"
+        }

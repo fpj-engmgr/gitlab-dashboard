@@ -889,12 +889,34 @@ function exportData(type) {
 document.addEventListener('DOMContentLoaded', () => {
     loadGroups();  // Load and populate group selector
     loadSavedDateRange();  // Load saved date range preference
+
+    // Restore saved tab or default to overview
+    const savedTab = localStorage.getItem('activeTab') || 'overview';
+    switchTab(savedTab);
+
     fetchMetrics();
     document.getElementById('refreshBtn').addEventListener('click', refreshData);
     document.getElementById('dateRangePreset').addEventListener('change', changeDateRange);
     document.getElementById('applyCustomRange').addEventListener('click', applyCustomDateRange);
     document.getElementById('groupFilter').addEventListener('change', changeGroup);
     document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
+
+    // Tab switching
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            switchTab(button.dataset.tab);
+        });
+    });
+
+    // Trend period toggle
+    document.querySelectorAll('input[name="trendPeriod"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            currentTrendPeriod = e.target.value;
+            if (window.trendsLoaded) {
+                loadTrends();
+            }
+        });
+    });
 
     // Export dropdown
     document.getElementById('exportBtn').addEventListener('click', toggleExportMenu);
@@ -1026,4 +1048,128 @@ function updateChartsForTheme(isDark) {
 
 // Load dark mode preference on page load (before DOMContentLoaded)
 loadDarkModePreference();
+
+// Tab switching
+function switchTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+
+    // Remove active class from all tab buttons
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('active');
+    });
+
+    // Show selected tab content
+    const selectedContent = document.getElementById(`tab-${tabName}`);
+    if (selectedContent) {
+        selectedContent.classList.add('active');
+    }
+
+    // Mark selected tab button as active
+    const selectedButton = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
+    if (selectedButton) {
+        selectedButton.classList.add('active');
+    }
+
+    // Save tab preference
+    localStorage.setItem('activeTab', tabName);
+
+    // Load trends if switching to trends tab
+    if (tabName === 'trends' && !window.trendsLoaded) {
+        loadTrends();
+    }
+}
+
+// Trend Analysis Chart
+let mrVelocityChart = null;
+let currentTrendPeriod = 'week';
+
+async function loadTrends() {
+    try {
+        const groupParam = currentGroup ? `&group_id=${currentGroup}` : '';
+        let dateParams = '';
+        if (currentStartDate && currentEndDate) {
+            const startDate = new Date(currentStartDate);
+            const now = new Date();
+            const daysFromStart = Math.max(1, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)) + 1);
+            dateParams = `days=${Math.floor(daysFromStart)}&start_date=${currentStartDate}&end_date=${currentEndDate}`;
+        } else {
+            const validDays = (currentDays && !isNaN(currentDays)) ? currentDays : 90;  // Default 90 days for trends
+            dateParams = `days=${validDays}`;
+        }
+
+        const response = await fetch(`/api/metrics/trends?${dateParams}${groupParam}&period=${currentTrendPeriod}`);
+        if (!response.ok) throw new Error(`Trends endpoint failed: ${response.status}`);
+
+        const data = await response.json();
+        updateMRVelocityChart(data);
+        window.trendsLoaded = true;
+    } catch (error) {
+        console.error('Error loading trends:', error);
+    }
+}
+
+function updateMRVelocityChart(data) {
+    const ctx = document.getElementById('mrVelocityChart').getContext('2d');
+
+    if (mrVelocityChart) {
+        mrVelocityChart.destroy();
+    }
+
+    const isDarkMode = document.body.classList.contains('dark-mode');
+    const textColor = isDarkMode ? '#e0e0e0' : '#333';
+    const gridColor = isDarkMode ? '#2a2a3e' : '#e9ecef';
+
+    mrVelocityChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.labels,
+            datasets: [
+                {
+                    label: 'MRs Created',
+                    data: data.created,
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                },
+                {
+                    label: 'MRs Merged',
+                    data: data.merged,
+                    borderColor: '#2ecc71',
+                    backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: { color: textColor }
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: textColor },
+                    grid: { color: gridColor }
+                },
+                x: {
+                    ticks: { color: textColor },
+                    grid: { color: gridColor }
+                }
+            }
+        }
+    });
+}
 

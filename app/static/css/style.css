@@ -113,6 +113,66 @@ header p {
     transform: translateY(-2px);
 }
 
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 8px;
+    margin: 25px 0 20px 0;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0;
+}
+
+.tab-button {
+    background: transparent;
+    border: none;
+    padding: 12px 24px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--card-subtext);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+    position: relative;
+    bottom: -2px;
+}
+
+.tab-button:hover {
+    color: var(--card-text);
+    background: var(--table-hover);
+}
+
+.tab-button.active {
+    color: var(--bg-gradient-start);
+    border-bottom-color: var(--bg-gradient-start);
+    font-weight: 600;
+}
+
+body.dark-mode .tab-button.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.trend-controls {
+    margin: 10px 0 20px 0;
+}
+
+.trend-controls label {
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.trend-controls input[type="radio"] {
+    cursor: pointer;
+}
+
 .metrics-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
