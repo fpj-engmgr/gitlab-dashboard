@@ -1198,7 +1198,7 @@ function updateSizeDistributionCharts(data) {
     mrSizeDistributionChart = new Chart(distCtx, {
         type: 'pie',
         data: {
-            labels: ['Small (< 3 files)', 'Medium (3-10 files)', 'Large (> 10 files)'],
+            labels: ['Small (< 100 lines)', 'Medium (100-500 lines)', 'Large (> 500 lines)'],
             datasets: [{
                 data: [data.small.count, data.medium.count, data.large.count],
                 backgroundColor: [

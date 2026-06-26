@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from app.config import settings
 import logging
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,84 @@ class GitLabClient:
         """Get the GitLab project."""
         return self.gl.projects.get(self.group_path)
 
+    def get_diff_stats_graphql(self, project_path: str, mr_iids: List[int]) -> Dict[int, Dict[str, int]]:
+        """
+        Fetch diff stats for multiple MRs using GraphQL API (much faster than REST).
+
+        Args:
+            project_path: Full project path (e.g., "group/subgroup/project")
+            mr_iids: List of MR IIDs to fetch stats for
+
+        Returns:
+            Dict mapping MR IID to {additions, deletions, changes}
+        """
+        if not mr_iids:
+            return {}
+
+        # Build GraphQL query for batch fetching (max 100 at a time for safety)
+        batch_size = 100
+        all_results = {}
+
+        for i in range(0, len(mr_iids), batch_size):
+            batch = mr_iids[i:i + batch_size]
+
+            # Create aliases for each MR in the batch
+            queries = []
+            for iid in batch:
+                queries.append(f"""
+                    mr{iid}: mergeRequest(iid: "{iid}") {{
+                      iid
+                      diffStatsSummary {{
+                        additions
+                        deletions
+                        changes
+                      }}
+                    }}
+                """)
+
+            query = f"""
+            query {{
+              project(fullPath: "{project_path}") {{
+                {chr(10).join(queries)}
+              }}
+            }}
+            """
+
+            try:
+                # Use requests to call GraphQL API
+                headers = {
+                    'Authorization': f'Bearer {settings.gitlab_token}',
+                    'Content-Type': 'application/json'
+                }
+
+                response = requests.post(
+                    f'{settings.gitlab_url}/api/graphql',
+                    json={'query': query},
+                    headers=headers,
+                    timeout=30
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    if 'data' in data and 'project' in data['data']:
+                        project_data = data['data']['project']
+                        for key, mr_data in project_data.items():
+                            if mr_data and 'diffStatsSummary' in mr_data:
+                                iid = mr_data['iid']
+                                stats = mr_data['diffStatsSummary']
+                                all_results[iid] = {
+                                    'additions': stats.get('additions', 0),
+                                    'deletions': stats.get('deletions', 0),
+                                    'changes': stats.get('changes', 0)  # Total files changed
+                                }
+                else:
+                    logger.warning(f"GraphQL request failed: {response.status_code}")
+
+            except Exception as e:
+                logger.error(f"Error fetching diff stats via GraphQL: {e}")
+
+        return all_results
+
     def get_merge_requests_for_member(self, username: str, days: int = 30) -> List[Dict[str, Any]]:
         """Fetch merge requests authored by a specific team member."""
         group = self.get_group()
@@ -46,20 +125,33 @@ class GitLabClient:
 
             logger.info(f"Found {len(group_mrs)} MRs for {username}")
 
+            # Group MRs by project for batch GraphQL fetching
+            mrs_by_project = {}
+            for mr in group_mrs:
+                project_path = getattr(mr, 'references', {}).get('full', 'unknown').split('!')[0]
+                if project_path not in mrs_by_project:
+                    mrs_by_project[project_path] = []
+                mrs_by_project[project_path].append(mr)
+
+            # Fetch diff stats for all MRs using GraphQL (batch by project)
+            diff_stats_cache = {}
+            for project_path, project_mrs in mrs_by_project.items():
+                iids = [mr.iid for mr in project_mrs]
+                stats = self.get_diff_stats_graphql(project_path, iids)
+                for iid, stat in stats.items():
+                    diff_stats_cache[f"{project_path}#{iid}"] = stat
+
+            # Now process all MRs with diff stats
             for mr in group_mrs:
                 try:
-                    # Get change statistics
-                    # Note: GitLab API doesn't provide additions/deletions in list view
-                    # We use changes_count (number of files changed) as a proxy for MR size
-                    # To get actual line counts, we'd need to fetch each MR individually (too slow)
-                    changes_count = getattr(mr, 'changes_count', None)
+                    project_path = getattr(mr, 'references', {}).get('full', 'unknown').split('!')[0]
+                    cache_key = f"{project_path}#{mr.iid}"
 
-                    # Estimate lines changed based on files changed
-                    # Average: small files ~50 lines, medium ~150, large ~300
-                    # This is a rough estimate for sizing purposes
-                    lines_changed = changes_count * 100 if changes_count else None  # Rough estimate
-                    lines_added = None  # Not available without detailed fetch
-                    lines_deleted = None  # Not available without detailed fetch
+                    # Get actual diff stats from GraphQL cache
+                    diff_stats = diff_stats_cache.get(cache_key, {})
+                    lines_added = diff_stats.get('additions', 0)
+                    lines_deleted = diff_stats.get('deletions', 0)
+                    lines_changed = lines_added + lines_deleted if (lines_added or lines_deleted) else None
 
                     mr_data = {
                         'group_id': self.group_id,  # Multi-group support
