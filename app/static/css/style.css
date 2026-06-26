@@ -128,12 +128,16 @@ header p {
     padding: 12px 24px;
     font-size: 15px;
     font-weight: 500;
-    color: var(--card-subtext);
+    color: #666;
     cursor: pointer;
     border-bottom: 3px solid transparent;
     transition: all 0.3s ease;
     position: relative;
     bottom: -2px;
+}
+
+body.dark-mode .tab-button {
+    color: #b0b0b0;
 }
 
 .tab-button:hover {
@@ -142,14 +146,14 @@ header p {
 }
 
 .tab-button.active {
-    color: var(--bg-gradient-start);
-    border-bottom-color: var(--bg-gradient-start);
+    color: #667eea;
+    border-bottom-color: #667eea;
     font-weight: 600;
 }
 
 body.dark-mode .tab-button.active {
-    color: #667eea;
-    border-bottom-color: #667eea;
+    color: #8b9ef9;
+    border-bottom-color: #8b9ef9;
 }
 
 .tab-content {
@@ -428,11 +432,52 @@ table tbody tr.stale-critical:hover {
     background: #ffcdd2;
 }
 
+/* Dark mode stale MR table rows */
+body.dark-mode table tbody tr.stale-mr {
+    background: rgba(255, 152, 0, 0.15);
+    border-left: 3px solid #ff9800;
+}
+
+body.dark-mode table tbody tr.stale-mr:hover {
+    background: rgba(255, 152, 0, 0.25);
+}
+
+body.dark-mode table tbody tr.stale-moderate {
+    background: rgba(255, 193, 7, 0.12);
+    border-left: 4px solid #ffc107;
+}
+
+body.dark-mode table tbody tr.stale-moderate:hover {
+    background: rgba(255, 193, 7, 0.2);
+}
+
+body.dark-mode table tbody tr.stale-high {
+    background: rgba(255, 152, 0, 0.18);
+    border-left: 4px solid #ff9800;
+}
+
+body.dark-mode table tbody tr.stale-high:hover {
+    background: rgba(255, 152, 0, 0.28);
+}
+
+body.dark-mode table tbody tr.stale-critical {
+    background: rgba(244, 67, 54, 0.18);
+    border-left: 4px solid #f44336;
+}
+
+body.dark-mode table tbody tr.stale-critical:hover {
+    background: rgba(244, 67, 54, 0.28);
+}
+
 .stale-help-text {
     color: #666;
     font-size: 0.9em;
     margin: -10px 0 15px 0;
     font-style: italic;
+}
+
+body.dark-mode .stale-help-text {
+    color: #b0b0b0;
 }
 
 .btn-link {
