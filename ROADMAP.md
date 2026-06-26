@@ -87,11 +87,11 @@ Currently shows `0` in hybrid mode where comments table is not fully populated.
 - ✅ Quick presets (Last 7/14/30/60/90 days, This Month, Last Month, This Quarter, Last Quarter)
 - ✅ Persist selection in browser localStorage
 - ✅ Auto-restore last selected range on page load
-- 📋 Compare to previous period option (future enhancement)
+- ✅ Compare to previous period (automatic, calendar-aware)
 
 **Value:** Enables specific reporting periods (e.g., "Q2 2026"), better for executive reports
 
-**Implementation:** Backend supports start_date/end_date parameters on all metric APIs. Frontend includes preset calculator and localStorage integration.
+**Implementation:** Backend supports start_date/end_date parameters on all metric APIs. Frontend includes preset calculator and localStorage integration. Automatic comparison to previous period with calendar-aware logic (month-to-month, quarter-to-quarter).
 
 ---
 
