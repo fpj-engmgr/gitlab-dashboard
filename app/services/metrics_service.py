@@ -1147,10 +1147,13 @@ class MetricsService:
         """
         Get MR size distribution and correlation with time-to-merge.
 
-        Size categories:
-        - Small: < 100 lines changed
-        - Medium: 100-500 lines changed
-        - Large: > 500 lines changed
+        Size categories (based on estimated lines from files changed):
+        - Small: < 3 files (~300 lines)
+        - Medium: 3-10 files (~300-1000 lines)
+        - Large: > 10 files (>1000 lines)
+
+        Note: lines_changed is estimated as files_changed * 100
+        Actual line counts would require fetching each MR individually (too slow).
 
         Returns distribution, avg time-to-merge per category, and avg comments per category.
         """
@@ -1189,11 +1192,12 @@ class MetricsService:
         large_mrs = []
 
         for mr in mrs:
-            if mr.lines_changed < 100:
+            # Size based on estimated lines (files * 100)
+            if mr.lines_changed < 300:  # < 3 files
                 small_mrs.append(mr)
-            elif mr.lines_changed <= 500:
+            elif mr.lines_changed <= 1000:  # 3-10 files
                 medium_mrs.append(mr)
-            else:
+            else:  # > 10 files
                 large_mrs.append(mr)
 
         total = len(mrs)

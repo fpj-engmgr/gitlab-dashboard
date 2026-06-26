@@ -48,12 +48,18 @@ class GitLabClient:
 
             for mr in group_mrs:
                 try:
-                    # Get change statistics (additions/deletions)
-                    lines_added = getattr(mr, 'additions', None)
-                    lines_deleted = getattr(mr, 'deletions', None)
-                    lines_changed = None
-                    if lines_added is not None and lines_deleted is not None:
-                        lines_changed = lines_added + lines_deleted
+                    # Get change statistics
+                    # Note: GitLab API doesn't provide additions/deletions in list view
+                    # We use changes_count (number of files changed) as a proxy for MR size
+                    # To get actual line counts, we'd need to fetch each MR individually (too slow)
+                    changes_count = getattr(mr, 'changes_count', None)
+
+                    # Estimate lines changed based on files changed
+                    # Average: small files ~50 lines, medium ~150, large ~300
+                    # This is a rough estimate for sizing purposes
+                    lines_changed = changes_count * 100 if changes_count else None  # Rough estimate
+                    lines_added = None  # Not available without detailed fetch
+                    lines_deleted = None  # Not available without detailed fetch
 
                     mr_data = {
                         'group_id': self.group_id,  # Multi-group support
