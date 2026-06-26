@@ -34,6 +34,7 @@ This document tracks planned features and improvements for the GitLab Metrics Da
 - [x] CSV export (dropdown menu with 4 export types)
 - [x] Configurable server port (PORT in .env, defaults to 8000)
 - [x] STALE_MR_DAYS configurable (default changed from 7 to 14 days)
+- [x] Historical comparison with percentage changes and arrow indicators
 
 ---
 
@@ -239,19 +240,19 @@ Sprint/iteration view for agile teams:
 
 ---
 
-### 🚧 Historical Comparison
-**Priority:** High | **Effort:** Medium | **Category:** Metrics | **Status:** In Progress
+### ✅ Historical Comparison
+**Priority:** High | **Effort:** Medium | **Category:** Metrics | **Status:** Completed
 
-Compare current period to previous periods:
-- Show percentage change for all metrics
-- "This month: 45 MRs (↑ 12% from last month)"
-- Arrow indicators (↑/↓/→)
-- Configurable comparison periods
-- Highlight significant changes
+~~Compare current period to previous periods:~~
+- ✅ Show percentage change for all metrics
+- ✅ Arrow indicators (↑/↓/→) with smart color coding
+- ✅ Automatic comparison to previous period (same duration)
+- ✅ Inverse coloring for "bad" metrics (↑ stale MRs = red, ↓ = green)
+- ✅ Dark mode support
 
 **Value:** Quickly spot trends, identify improvements or regressions
 
-**Next Steps:** Implement comparison to previous period (same duration), add percentage change indicators to metric cards.
+**Implementation:** New `/api/metrics/comparison` endpoint calculates previous period metrics and percentage changes. Frontend displays arrows with color-coded indicators on all metric cards. Green = good (↑ MRs), Red = bad (↑ merge time), with inverse logic for metrics where lower is better.
 
 ---
 
@@ -470,7 +471,7 @@ Features will be grouped into releases:
 **v1.1** (Current)
 - ✅ Stale MR detection
 - ✅ Review response time metrics
-- 🚧 Historical comparison (in progress)
+- ✅ Historical comparison
 - ✅ Export to CSV
 - ✅ Dark mode
 - ✅ Configurable port
@@ -488,4 +489,4 @@ Features will be grouped into releases:
 
 ---
 
-*Last Updated: 2026-06-26 (PM)*
+*Last Updated: 2026-06-26 (Evening)*
