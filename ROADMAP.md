@@ -37,6 +37,7 @@ This document tracks planned features and improvements for the GitLab Metrics Da
 - [x] Historical comparison with calendar-aware logic (month-to-month, quarter-to-quarter)
 - [x] Tabbed navigation (Overview, Trends, Contributors, Merge Requests)
 - [x] Trend analysis charts with weekly/monthly toggle
+- [x] MR size distribution with correlation analysis
 
 ---
 
@@ -152,17 +153,20 @@ Currently shows `0` in hybrid mode where comments table is not fully populated.
 
 ---
 
-### 📋 MR Size Distribution
-**Priority:** Medium | **Effort:** Medium | **Category:** Metrics
+### ✅ MR Size Distribution
+**Priority:** Medium | **Effort:** Medium | **Category:** Metrics | **Status:** Completed
 
-Categorize MRs by size and analyze impact:
-- Define size categories (Small: <100 lines, Medium: 100-500, Large: >500)
-- Size distribution chart (bar/pie chart)
-- Correlation: Size vs Time-to-Merge
-- Average comments per size category
-- Encourage smaller, faster MRs
+~~Categorize MRs by size and analyze impact:~~
+- ✅ Size categories defined (Small: <100 lines, Medium: 100-500, Large: >500)
+- ✅ Pie chart showing size distribution
+- ✅ Bar chart: Avg time-to-merge by size
+- ✅ Smart insights and recommendations
+- ✅ Tracks lines added, deleted, and total changed
+- 📋 Average comments per size category (future enhancement)
 
 **Value:** Identifies if large MRs are slowing down reviews, encourages best practices
+
+**Implementation:** New fields (lines_added, lines_deleted, lines_changed) in MergeRequest schema. GitLab API provides change statistics. Size distribution endpoint categorizes MRs and calculates avg time-to-merge per category. Charts in Trends tab with actionable insights.
 
 ---
 
@@ -486,9 +490,11 @@ Features will be grouped into releases:
 - ✅ Custom date ranges
 - ✅ Tabbed navigation
 - ✅ Trend analysis charts
+- ✅ MR size distribution
 
 **v1.2** (Future)
-- MR size distribution
+- Review activity heatmap
+- Top reviewers chart
 - Health score per group
 
 **v2.0** (Future)
@@ -498,4 +504,4 @@ Features will be grouped into releases:
 
 ---
 
-*Last Updated: 2026-06-26 (Late Evening)*
+*Last Updated: 2026-06-26 (Night)*
