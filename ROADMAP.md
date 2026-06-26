@@ -31,6 +31,9 @@ This document tracks planned features and improvements for the GitLab Metrics Da
 - [x] Compact group breakdown view
 - [x] Helper scripts (start.sh, stop.sh)
 - [x] All team members in table (including 0 contributions)
+- [x] CSV export (dropdown menu with 4 export types)
+- [x] Configurable server port (PORT in .env, defaults to 8000)
+- [x] STALE_MR_DAYS configurable (default changed from 7 to 14 days)
 
 ---
 
@@ -91,16 +94,22 @@ Currently shows `0` in hybrid mode where comments table is not fully populated.
 
 ---
 
-### 📋 Export to CSV
-**Priority:** Medium | **Effort:** Low | **Category:** Data Export
+### ✅ Export to CSV
+**Priority:** Medium | **Effort:** Low | **Category:** Data Export | **Status:** Completed
 
-Add download buttons for data export:
-- Export contributor stats table to CSV
-- Export MR list to CSV
-- Export summary metrics to CSV
-- Include filters/date range in filename (e.g., `contributors_2026-06-01_to_2026-06-30.csv`)
+~~Add download buttons for data export:~~
+- ✅ Export dropdown menu with 4 options
+- ✅ Export contributor stats table to CSV
+- ✅ Export MR list to CSV
+- ✅ Export stale MRs to CSV
+- ✅ Export summary metrics to CSV
+- ✅ Include filters/date range in filename (e.g., `contributors_2026-06-01_to_2026-06-30.csv`)
+- ✅ Smart filenames with timestamp and filter info
+- ✅ Respects current date range and group filters
 
 **Value:** Enables offline analysis, executive reporting, data archival
+
+**Implementation:** Dropdown button (📥 Export) with 4 endpoints, uses FastAPI StreamingResponse, CSV DictWriter with extrasaction='ignore'.
 
 ---
 
@@ -230,8 +239,8 @@ Sprint/iteration view for agile teams:
 
 ---
 
-### 📋 Historical Comparison
-**Priority:** High | **Effort:** Medium | **Category:** Metrics
+### 🚧 Historical Comparison
+**Priority:** High | **Effort:** Medium | **Category:** Metrics | **Status:** In Progress
 
 Compare current period to previous periods:
 - Show percentage change for all metrics
@@ -241,6 +250,8 @@ Compare current period to previous periods:
 - Highlight significant changes
 
 **Value:** Quickly spot trends, identify improvements or regressions
+
+**Next Steps:** Implement comparison to previous period (same duration), add percentage change indicators to metric cards.
 
 ---
 
@@ -456,11 +467,14 @@ Features will be grouped into releases:
 **v1.0** (Current)
 - Core multi-group dashboard with contributor tracking
 
-**v1.1** (Next)
-- Stale MR detection
-- Review response time metrics
-- Historical comparison
-- Export to CSV
+**v1.1** (Current)
+- ✅ Stale MR detection
+- ✅ Review response time metrics
+- 🚧 Historical comparison (in progress)
+- ✅ Export to CSV
+- ✅ Dark mode
+- ✅ Configurable port
+- ✅ Custom date ranges
 
 **v1.2** (Future)
 - Trend analysis charts
@@ -474,4 +488,4 @@ Features will be grouped into releases:
 
 ---
 
-*Last Updated: 2026-06-26*
+*Last Updated: 2026-06-26 (PM)*
