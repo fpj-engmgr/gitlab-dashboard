@@ -365,9 +365,25 @@ class MetricsService:
                                 'age_days': round(age_days, 2)
                             })
 
-            logger.info(f"Stale MR count recalculation: old={stale_count}, new={actual_stale_count}, total_open={len([mr for mr in result['merge_requests'] if mr['state'] == 'opened'])}, threshold={settings.stale_mr_days}")
+            total_mrs_returned = len(result["merge_requests"])
+            total_open_mrs = len([mr for mr in result["merge_requests"] if mr["state"] == "opened"])
+
+            logger.info(f"Stale MR count recalculation: old={stale_count}, new={actual_stale_count}, total_MRs_in_response={total_mrs_returned}, total_open={total_open_mrs}, threshold={settings.stale_mr_days}")
+
             if actual_stale_count != stale_count:
-                logger.warning(f"Stale count mismatch! Showing oldest stale MRs: {stale_mrs_debug[:5]}")
+                logger.warning(f"Stale count mismatch! Old={stale_count}, New={actual_stale_count}")
+                logger.warning(f"First 5 stale MRs: {stale_mrs_debug[:5]}")
+
+            # Find MRs at the boundary (13.5 to 14.5 days)
+            boundary_mrs = [
+                {'title': mr_dict['title'][:50], 'age': round((datetime.utcnow() - datetime.fromisoformat(mr_dict['created_at'].replace('Z', '+00:00').replace('+00:00', ''))).total_seconds() / 86400, 3)}
+                for mr_dict in result["merge_requests"]
+                if mr_dict["state"] == "opened"
+                and 13.5 < (datetime.utcnow() - datetime.fromisoformat(mr_dict['created_at'].replace('Z', '+00:00').replace('+00:00', ''))).total_seconds() / 86400 < 14.5
+            ]
+            if boundary_mrs:
+                logger.info(f"MRs near 14-day boundary: {boundary_mrs}")
+
             result["stale"] = actual_stale_count
         except Exception as e:
             logger.error(f"Error recalculating stale count: {e}", exc_info=True)
