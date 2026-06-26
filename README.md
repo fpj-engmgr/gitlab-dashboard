@@ -15,7 +15,7 @@ A web dashboard for monitoring GitLab metrics for your engineering team. Uses a 
 - **Multi-Source Tracking**: Monitor multiple GitLab groups and individual projects in a single dashboard
 - **Group Filtering**: View metrics across all sources or filter by specific group/project
 - **Merge Request Metrics**: Track total, merged, open, and closed MRs with average and median time to merge
-- **Stale MR Detection** 🚨: Identify MRs needing attention with configurable threshold (default 7 days)
+- **Stale MR Detection** 🚨: Identify MRs needing attention with configurable threshold (default 14 days)
   - Metric card with warning styling when stale MRs detected
   - Dedicated sortable table with severity-based color coding (yellow → orange → red)
   - Sort by title, project, author, days open, or creation date
@@ -235,7 +235,7 @@ Edit `.env` to customize:
 - `TEAM_MEMBERS_FILE`: Path to JSON file with team member usernames (default: team_members.json)
 - `FETCH_COMMENT_DETAILS`: Set to `True` to fetch MR comments (required for review metrics, slower)
 - `ENABLE_REVIEW_METRICS`: Set to `True` to enable review response time metrics (default: `True`)
-- `STALE_MR_DAYS`: MRs open longer than this many days are highlighted as stale (default: 7)
+- `STALE_MR_DAYS`: MRs open longer than this many days are highlighted as stale (default: 14)
 - `PORT`: Port to run the server on (default: 8000)
 
 ### ⚠️ Review Response Time Metrics - Performance Impact
@@ -279,7 +279,7 @@ The dashboard highlights merge requests that have been open longer than a config
 
 **Configuration:**
 ```bash
-STALE_MR_DAYS=7  # MRs older than this are highlighted (default: 7 days)
+STALE_MR_DAYS=14  # MRs older than this are highlighted (default: 14 days)
 ```
 
 **Features:**
