@@ -120,6 +120,10 @@ header p {
     margin: 25px 0 20px 0;
     border-bottom: 2px solid var(--border-color);
     padding-bottom: 0;
+    background: var(--card-bg);
+    padding: 8px 8px 0 8px;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 2px 8px var(--shadow-color);
 }
 
 .tab-button {
