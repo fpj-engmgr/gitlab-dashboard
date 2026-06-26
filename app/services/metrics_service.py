@@ -415,22 +415,79 @@ class MetricsService:
         group_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Calculate metrics for the previous period (same duration) for comparison.
+        Calculate metrics for the previous period with calendar-aware comparison.
         Returns percentage changes for key metrics.
+
+        Calendar-aware logic:
+        - Full month (starts on day 1, 28-31 days) → compare to previous full month
+        - Full quarter (starts on Q start, ~90 days) → compare to previous quarter
+        - Otherwise → compare to same duration before start date
         """
         # Calculate previous period dates
         if start_date and end_date:
-            # Custom date range - calculate previous period of same duration
             start_dt = datetime.fromisoformat(start_date)
             end_dt = datetime.fromisoformat(end_date)
-            duration = (end_dt - start_dt).days
+            duration = (end_dt - start_dt).days  # Days between (not inclusive)
+            duration_inclusive = duration + 1     # Include both start and end day
 
-            prev_end_dt = start_dt - timedelta(days=1)
-            prev_start_dt = prev_end_dt - timedelta(days=duration)
+            # Check if this is a full month comparison
+            is_month_start = start_dt.day == 1
+            is_month_duration = 28 <= duration_inclusive <= 31
+
+            if is_month_start and is_month_duration:
+                # Month-to-month comparison
+                # Go back one month from start_dt
+                if start_dt.month == 1:
+                    prev_start_dt = start_dt.replace(year=start_dt.year - 1, month=12, day=1)
+                else:
+                    prev_start_dt = start_dt.replace(month=start_dt.month - 1, day=1)
+
+                # Last day of previous month
+                if prev_start_dt.month == 12:
+                    next_month_dt = prev_start_dt.replace(year=prev_start_dt.year + 1, month=1, day=1)
+                else:
+                    next_month_dt = prev_start_dt.replace(month=prev_start_dt.month + 1, day=1)
+                prev_end_dt = next_month_dt - timedelta(days=1)
+
+                logger.info(f"Month-to-month comparison: {start_dt.strftime('%B %Y')} vs {prev_start_dt.strftime('%B %Y')}")
+
+            # Check if this is a full quarter comparison
+            elif is_month_start and 89 <= duration_inclusive <= 92:
+                # Quarter starts: Jan 1, Apr 1, Jul 1, Oct 1
+                is_quarter_start = start_dt.month in [1, 4, 7, 10]
+
+                if is_quarter_start:
+                    # Quarter-to-quarter comparison
+                    if start_dt.month == 1:
+                        # Q1 → compare to Q4 of previous year
+                        prev_start_dt = start_dt.replace(year=start_dt.year - 1, month=10, day=1)
+                        prev_end_dt = start_dt.replace(year=start_dt.year - 1, month=12, day=31)
+                    else:
+                        # Q2/Q3/Q4 → compare to previous quarter same year
+                        prev_quarter_month = start_dt.month - 3
+                        prev_start_dt = start_dt.replace(month=prev_quarter_month, day=1)
+                        # End of quarter is last day of month+2
+                        end_month = prev_quarter_month + 2
+                        if end_month == 12:
+                            next_month_dt = prev_start_dt.replace(year=prev_start_dt.year + 1, month=1, day=1)
+                        else:
+                            next_month_dt = prev_start_dt.replace(month=end_month + 1, day=1)
+                        prev_end_dt = next_month_dt - timedelta(days=1)
+
+                    logger.info(f"Quarter-to-quarter comparison: Q{(start_dt.month-1)//3 + 1} {start_dt.year} vs Q{(prev_start_dt.month-1)//3 + 1} {prev_start_dt.year}")
+                else:
+                    # Same duration fallback
+                    prev_end_dt = start_dt - timedelta(days=1)
+                    prev_start_dt = prev_end_dt - timedelta(days=duration)
+            else:
+                # Default: same duration comparison
+                prev_end_dt = start_dt - timedelta(days=1)
+                prev_start_dt = prev_end_dt - timedelta(days=duration)
+                logger.info(f"Same-duration comparison: {duration} days")
 
             prev_start = prev_start_dt.isoformat()
             prev_end = prev_end_dt.isoformat()
-            prev_days = duration + 1
+            prev_days = (prev_end_dt - prev_start_dt).days + 1
         else:
             # Days-based - just double the days to get previous period
             prev_days = days
