@@ -339,6 +339,8 @@ class MetricsService:
         try:
             stale_threshold_dt = datetime.utcnow() - timedelta(days=settings.stale_mr_days)
             actual_stale_count = 0
+            stale_mrs_debug = []
+
             for mr_dict in result["merge_requests"]:
                 if mr_dict["state"] == "opened":
                     # Parse the ISO format datetime string
@@ -350,10 +352,22 @@ class MetricsService:
                     else:
                         created_dt = datetime.fromisoformat(created_at_str)
 
-                    if created_dt < stale_threshold_dt:
-                        actual_stale_count += 1
+                    age_days = (datetime.utcnow() - created_dt).total_seconds() / 86400
 
-            logger.info(f"Stale MR count recalculation: old={stale_count}, new={actual_stale_count}, total_open={len([mr for mr in result['merge_requests'] if mr['state'] == 'opened'])}")
+                    # Frontend uses: ageInDays > staleThreshold
+                    # Backend original used: created_at < (now - threshold)
+                    # These should be equivalent, so let's match frontend exactly
+                    if age_days > settings.stale_mr_days:
+                        actual_stale_count += 1
+                        if len(stale_mrs_debug) < 30:  # Log first 30
+                            stale_mrs_debug.append({
+                                'title': mr_dict['title'][:50],
+                                'age_days': round(age_days, 2)
+                            })
+
+            logger.info(f"Stale MR count recalculation: old={stale_count}, new={actual_stale_count}, total_open={len([mr for mr in result['merge_requests'] if mr['state'] == 'opened'])}, threshold={settings.stale_mr_days}")
+            if actual_stale_count != stale_count:
+                logger.warning(f"Stale count mismatch! Showing oldest stale MRs: {stale_mrs_debug[:5]}")
             result["stale"] = actual_stale_count
         except Exception as e:
             logger.error(f"Error recalculating stale count: {e}", exc_info=True)
