@@ -2,6 +2,11 @@
 # Start the GitLab Dashboard server
 # Port is configurable via PORT env var, defaults to 8000 (set in .env)
 
+# Load PORT from .env if it exists
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | grep PORT | xargs)
+fi
+
 # Get port from environment or default to 8000
 PORT=${PORT:-8000}
 
