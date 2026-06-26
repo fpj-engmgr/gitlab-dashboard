@@ -331,6 +331,15 @@ class MetricsService:
 
         result["merge_requests"].extend(additional_open_mrs)
 
+        # Recalculate stale count from the actual MRs we're returning
+        # This ensures the count matches what the frontend will display
+        stale_threshold_dt = datetime.utcnow() - timedelta(days=settings.stale_mr_days)
+        actual_stale_count = sum(
+            1 for mr_dict in result["merge_requests"]
+            if mr_dict["state"] == "opened" and datetime.fromisoformat(mr_dict["created_at"]) < stale_threshold_dt
+        )
+        result["stale"] = actual_stale_count
+
         # Add group breakdown if viewing all groups
         if not (group_id or self.group_id):
             result["by_group"] = self._get_group_breakdown(self.db.query(MergeRequest).all())
