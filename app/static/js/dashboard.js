@@ -773,6 +773,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('dateRangePreset').addEventListener('change', changeDateRange);
     document.getElementById('applyCustomRange').addEventListener('click', applyCustomDateRange);
     document.getElementById('groupFilter').addEventListener('change', changeGroup);
+    document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
 
     // Add click handlers for contributor table sortable headers
     const contributorTable = document.querySelector('#contributorTableBody').closest('table');
@@ -819,3 +820,63 @@ function changeGroup() {
     currentGroup = selector.value || null;
     fetchMetrics();
 }
+
+// Dark mode toggle functionality
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    const isDark = document.body.classList.contains('dark-mode');
+    
+    // Update toggle button icon
+    const toggleBtn = document.getElementById('darkModeToggle');
+    toggleBtn.textContent = isDark ? '☀️' : '🌙';
+    
+    // Save preference to localStorage
+    localStorage.setItem('darkMode', isDark ? 'enabled' : 'disabled');
+    
+    // Update Chart.js charts to use appropriate colors
+    updateChartsForTheme(isDark);
+}
+
+function loadDarkModePreference() {
+    const darkMode = localStorage.getItem('darkMode');
+    if (darkMode === 'enabled') {
+        document.body.classList.add('dark-mode');
+        const toggleBtn = document.getElementById('darkModeToggle');
+        if (toggleBtn) {
+            toggleBtn.textContent = '☀️';
+        }
+    }
+}
+
+function updateChartsForTheme(isDark) {
+    // Update existing charts with new grid/text colors
+    const gridColor = isDark ? '#2a2a3e' : '#e9ecef';
+    const textColor = isDark ? '#b0b0b0' : '#666';
+    
+    Object.values(charts).forEach(chart => {
+        if (chart && chart.options) {
+            // Update grid colors
+            if (chart.options.scales) {
+                Object.values(chart.options.scales).forEach(scale => {
+                    if (scale.grid) {
+                        scale.grid.color = gridColor;
+                    }
+                    if (scale.ticks) {
+                        scale.ticks.color = textColor;
+                    }
+                });
+            }
+            
+            // Update legend colors
+            if (chart.options.plugins && chart.options.plugins.legend) {
+                chart.options.plugins.legend.labels.color = textColor;
+            }
+            
+            chart.update();
+        }
+    });
+}
+
+// Load dark mode preference on page load (before DOMContentLoaded)
+loadDarkModePreference();
+

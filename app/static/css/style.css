@@ -1,3 +1,35 @@
+:root {
+    /* Light mode colors */
+    --bg-gradient-start: #667eea;
+    --bg-gradient-end: #764ba2;
+    --header-bg: rgba(255, 255, 255, 0.95);
+    --header-text: #333;
+    --header-subtext: #666;
+    --card-bg: #ffffff;
+    --card-text: #333;
+    --card-subtext: #666;
+    --border-color: #e9ecef;
+    --table-hover: #f8f9fa;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --chart-grid: #e9ecef;
+}
+
+body.dark-mode {
+    /* Dark mode colors */
+    --bg-gradient-start: #1a1a2e;
+    --bg-gradient-end: #16213e;
+    --header-bg: rgba(30, 30, 46, 0.95);
+    --header-text: #e0e0e0;
+    --header-subtext: #b0b0b0;
+    --card-bg: #1e1e2e;
+    --card-text: #e0e0e0;
+    --card-subtext: #b0b0b0;
+    --border-color: #2a2a3e;
+    --table-hover: #2a2a3e;
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --chart-grid: #2a2a3e;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -6,26 +38,28 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
     min-height: 100vh;
     padding-bottom: 40px;
+    transition: background 0.3s ease;
 }
 
 header {
-    background: rgba(255, 255, 255, 0.95);
+    background: var(--header-bg);
     padding: 30px 0;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 10px var(--shadow-color);
     margin-bottom: 30px;
+    transition: background 0.3s ease;
 }
 
 header h1 {
-    color: #333;
+    color: var(--header-text);
     font-size: 2.5em;
     margin-bottom: 5px;
 }
 
 header p {
-    color: #666;
+    color: var(--header-subtext);
     font-size: 1.1em;
 }
 
@@ -36,27 +70,31 @@ header p {
 }
 
 .controls {
-    background: white;
+    background: var(--card-bg);
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px var(--shadow-color);
     margin-bottom: 30px;
     display: flex;
     gap: 20px;
     align-items: center;
+    transition: background 0.3s ease;
 }
 
 .controls label {
     font-weight: 600;
-    color: #333;
+    color: var(--card-text);
 }
 
-.controls select {
+.controls select,
+.controls input[type="date"] {
     padding: 8px 12px;
-    border: 2px solid #ddd;
+    border: 2px solid var(--border-color);
     border-radius: 4px;
     font-size: 1em;
     cursor: pointer;
+    background: var(--card-bg);
+    color: var(--card-text);
 }
 
 .controls button {
@@ -83,11 +121,12 @@ header p {
 }
 
 .metric-card {
-    background: white;
+    background: var(--card-bg);
     padding: 25px;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px var(--shadow-color);
     text-align: center;
+    transition: background 0.3s ease;
 }
 
 .metric-card.warning {
@@ -95,12 +134,16 @@ header p {
     border-left: 4px solid #ff9800;
 }
 
+body.dark-mode .metric-card.warning {
+    background: linear-gradient(135deg, #3a2a00 0%, #4a3300 100%);
+}
+
 .metric-card.warning .value {
     color: #e65100;
 }
 
 .metric-card h3 {
-    color: #666;
+    color: var(--card-subtext);
     font-size: 0.9em;
     text-transform: uppercase;
     margin-bottom: 10px;
@@ -403,4 +446,71 @@ a:hover {
 
 .group-breakdown-item .mini-metrics span {
     font-size: 0.95em;
+}
+
+/* Dark mode toggle button */
+.theme-toggle {
+    margin-left: auto;
+    background: var(--card-bg) !important;
+    border: 2px solid var(--border-color) !important;
+    color: var(--card-text);
+    padding: 8px 16px !important;
+    font-size: 1.2em;
+    cursor: pointer;
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, background 0.3s;
+}
+
+.theme-toggle:hover {
+    transform: scale(1.1) !important;
+}
+
+/* Update table styles for dark mode */
+table {
+    background: var(--card-bg);
+    color: var(--card-text);
+    transition: background 0.3s ease;
+}
+
+table th {
+    background: var(--card-bg);
+    color: var(--card-subtext);
+}
+
+table td {
+    border-bottom: 1px solid var(--border-color);
+}
+
+table tbody tr:hover {
+    background: var(--table-hover);
+}
+
+/* Update chart containers for dark mode */
+.chart-card,
+.table-card,
+.group-breakdown-card {
+    background: var(--card-bg);
+    color: var(--card-text);
+    box-shadow: 0 2px 8px var(--shadow-color);
+    transition: background 0.3s ease;
+}
+
+.chart-card h2,
+.table-card h2,
+.group-breakdown-card h2 {
+    color: var(--card-text);
+}
+
+.stale-help-text {
+    color: var(--card-subtext);
+}
+
+/* Badge colors remain vibrant in both modes */
+.badge {
+    /* Keep existing badge colors - they work in both modes */
 }
