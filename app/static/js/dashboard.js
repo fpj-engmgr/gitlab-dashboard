@@ -533,7 +533,7 @@ function renderStaleMRsTable() {
             <td><a href="${mr.web_url}" target="_blank">${mr.title}</a></td>
             <td>${mr.project_name}</td>
             <td>${mr.author}</td>
-            <td><strong>${mr.daysOpen} days</strong></td>
+            <td><strong>${mr.daysOpen.toFixed(1)} days</strong></td>
             <td>${mr.createdDate.toLocaleDateString()}</td>
             <td><a href="${mr.web_url}" target="_blank" class="btn-link">View MR →</a></td>
         `;
