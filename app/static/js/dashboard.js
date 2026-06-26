@@ -390,8 +390,33 @@ function updateStaleMRsTable(mergeRequests, staleThreshold = 14) {
 
     console.log(`Filtering ${mergeRequests.length} MRs with threshold ${staleThreshold} days`);
 
+    // First, count all open MRs and log their ages
+    const openMRs = mergeRequests.filter(mr => mr.state === 'opened');
+    console.log(`Total open MRs: ${openMRs.length}`);
+
+    // Calculate ages for all open MRs
+    const openMRsWithAges = openMRs.map(mr => {
+        const createdDate = new Date(mr.created_at);
+        const now = new Date();
+        const ageInDays = (now - createdDate) / (1000 * 60 * 60 * 24);
+        return {
+            title: mr.title.substring(0, 60),
+            age: ageInDays,
+            state: mr.state
+        };
+    }).sort((a, b) => b.age - a.age);
+
+    // Count how many should be stale
+    const shouldBeStale = openMRsWithAges.filter(mr => mr.age > staleThreshold).length;
+    console.log(`Open MRs older than ${staleThreshold} days: ${shouldBeStale}`);
+
+    // Log the oldest 30 MRs with their exact ages
+    console.log('Oldest 30 open MRs:', openMRsWithAges.slice(0, 30).map(mr => ({
+        title: mr.title,
+        age: mr.age.toFixed(2) + ' days'
+    })));
+
     // Filter for stale MRs (open and older than threshold)
-    // Backend uses created_at < (now - threshold) which means age > threshold
     const boundaryMRs = []; // Track MRs near the boundary
     allStaleMRs = mergeRequests
         .filter(mr => {
