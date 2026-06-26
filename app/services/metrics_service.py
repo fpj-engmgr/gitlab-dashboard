@@ -301,6 +301,7 @@ class MetricsService:
                     "merged_at": mr.merged_at.isoformat() if mr.merged_at else None,
                     "time_to_merge_hours": mr.time_to_merge_hours,
                     "web_url": mr.web_url,
+                    "days_open": (datetime.utcnow() - mr.created_at).days if mr.state == "opened" else None,
                 }
                 for mr in mrs
             ]
@@ -328,6 +329,7 @@ class MetricsService:
                 "merged_at": None,
                 "time_to_merge_hours": None,
                 "web_url": mr.web_url,
+                "days_open": (datetime.utcnow() - mr.created_at).days,
             }
             for mr in all_open_mrs if mr.id not in existing_ids
         ]

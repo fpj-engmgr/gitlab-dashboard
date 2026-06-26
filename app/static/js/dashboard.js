@@ -395,10 +395,11 @@ function updateStaleMRsTable(mergeRequests, staleThreshold = 14) {
     console.log(`Total open MRs: ${openMRs.length}`);
 
     // Calculate ages for all open MRs
+    // Use backend's days_open if available to avoid timing mismatches
     const openMRsWithAges = openMRs.map(mr => {
-        const createdDate = new Date(mr.created_at);
-        const now = new Date();
-        const ageInDays = (now - createdDate) / (1000 * 60 * 60 * 24);
+        const ageInDays = mr.days_open !== undefined && mr.days_open !== null
+            ? mr.days_open
+            : (new Date() - new Date(mr.created_at)) / (1000 * 60 * 60 * 24);
         return {
             title: mr.title.substring(0, 60),
             age: ageInDays,
@@ -417,15 +418,16 @@ function updateStaleMRsTable(mergeRequests, staleThreshold = 14) {
     })));
 
     // Filter for stale MRs (open and older than threshold)
+    // Use backend's days_open to match backend calculation exactly
     const boundaryMRs = []; // Track MRs near the boundary
     allStaleMRs = mergeRequests
         .filter(mr => {
             if (mr.state !== 'opened') return false;
 
-            const createdDate = new Date(mr.created_at);
-            const now = new Date();
-            const ageInMs = now - createdDate;
-            const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
+            // Use backend's days_open if available, otherwise calculate
+            const ageInDays = mr.days_open !== undefined && mr.days_open !== null
+                ? mr.days_open
+                : (new Date() - new Date(mr.created_at)) / (1000 * 60 * 60 * 24);
 
             // Track MRs within 0.1 days of the threshold
             if (Math.abs(ageInDays - staleThreshold) < 0.1) {
@@ -436,17 +438,18 @@ function updateStaleMRsTable(mergeRequests, staleThreshold = 14) {
                 });
             }
 
-            // Backend comparison: created_at < (now - threshold_days)
-            // Which is equivalent to: age_in_days > threshold_days
+            // Match backend exactly: age > threshold
             return ageInDays > staleThreshold;
         })
         .map(mr => {
-            const createdDate = new Date(mr.created_at);
-            const daysOpen = Math.floor((new Date() - createdDate) / (1000 * 60 * 60 * 24));
+            // Use backend's days_open if available
+            const daysOpen = mr.days_open !== undefined && mr.days_open !== null
+                ? mr.days_open
+                : Math.floor((new Date() - new Date(mr.created_at)) / (1000 * 60 * 60 * 24));
             return {
                 ...mr,
                 daysOpen: daysOpen,
-                createdDate: createdDate
+                createdDate: new Date(mr.created_at)
             };
         });
 
