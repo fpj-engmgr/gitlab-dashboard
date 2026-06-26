@@ -338,6 +338,8 @@ class MetricsService:
             1 for mr_dict in result["merge_requests"]
             if mr_dict["state"] == "opened" and datetime.fromisoformat(mr_dict["created_at"]) < stale_threshold_dt
         )
+
+        logger.info(f"Stale MR count recalculation: old={stale_count}, new={actual_stale_count}, total_open={len([mr for mr in result['merge_requests'] if mr['state'] == 'opened'])}")
         result["stale"] = actual_stale_count
 
         # Add group breakdown if viewing all groups
