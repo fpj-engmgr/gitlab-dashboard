@@ -2,10 +2,13 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional, Dict, Any, List
+import logging
 from app.models.schemas import MergeRequest, Commit, Comment, Contributor, CacheMetadata
 from app.services.gitlab_client import GitLabClient
 from app.services.multi_group_client import MultiGroupGitLabClient
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class MetricsService:
