@@ -333,14 +333,29 @@ class MetricsService:
 
         # Recalculate stale count from the actual MRs we're returning
         # This ensures the count matches what the frontend will display
-        stale_threshold_dt = datetime.utcnow() - timedelta(days=settings.stale_mr_days)
-        actual_stale_count = sum(
-            1 for mr_dict in result["merge_requests"]
-            if mr_dict["state"] == "opened" and datetime.fromisoformat(mr_dict["created_at"]) < stale_threshold_dt
-        )
+        try:
+            stale_threshold_dt = datetime.utcnow() - timedelta(days=settings.stale_mr_days)
+            actual_stale_count = 0
+            for mr_dict in result["merge_requests"]:
+                if mr_dict["state"] == "opened":
+                    # Parse the ISO format datetime string
+                    created_at_str = mr_dict["created_at"]
+                    # Handle both with and without timezone
+                    if created_at_str.endswith('+00:00') or created_at_str.endswith('Z'):
+                        created_at_str = created_at_str.replace('Z', '+00:00')
+                        created_dt = datetime.fromisoformat(created_at_str).replace(tzinfo=None)
+                    else:
+                        created_dt = datetime.fromisoformat(created_at_str)
 
-        logger.info(f"Stale MR count recalculation: old={stale_count}, new={actual_stale_count}, total_open={len([mr for mr in result['merge_requests'] if mr['state'] == 'opened'])}")
-        result["stale"] = actual_stale_count
+                    if created_dt < stale_threshold_dt:
+                        actual_stale_count += 1
+
+            logger.info(f"Stale MR count recalculation: old={stale_count}, new={actual_stale_count}, total_open={len([mr for mr in result['merge_requests'] if mr['state'] == 'opened'])}")
+            result["stale"] = actual_stale_count
+        except Exception as e:
+            logger.error(f"Error recalculating stale count: {e}", exc_info=True)
+            # Fall back to original count on error
+            result["stale"] = stale_count
 
         # Add group breakdown if viewing all groups
         if not (group_id or self.group_id):
