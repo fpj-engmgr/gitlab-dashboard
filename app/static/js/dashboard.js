@@ -392,6 +392,7 @@ function updateStaleMRsTable(mergeRequests, staleThreshold = 14) {
 
     // Filter for stale MRs (open and older than threshold)
     // Backend uses created_at < (now - threshold) which means age > threshold
+    const boundaryMRs = []; // Track MRs near the boundary
     allStaleMRs = mergeRequests
         .filter(mr => {
             if (mr.state !== 'opened') return false;
@@ -400,6 +401,15 @@ function updateStaleMRsTable(mergeRequests, staleThreshold = 14) {
             const now = new Date();
             const ageInMs = now - createdDate;
             const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
+
+            // Track MRs within 0.1 days of the threshold
+            if (Math.abs(ageInDays - staleThreshold) < 0.1) {
+                boundaryMRs.push({
+                    title: mr.title.substring(0, 50),
+                    age: ageInDays.toFixed(4),
+                    threshold: staleThreshold
+                });
+            }
 
             // Backend comparison: created_at < (now - threshold_days)
             // Which is equivalent to: age_in_days > threshold_days
@@ -414,6 +424,11 @@ function updateStaleMRsTable(mergeRequests, staleThreshold = 14) {
                 createdDate: createdDate
             };
         });
+
+    console.log(`Found ${allStaleMRs.length} stale MRs (threshold: ${staleThreshold} days)`);
+    if (boundaryMRs.length > 0) {
+        console.log('MRs near threshold boundary:', boundaryMRs);
+    }
 
     // Show/hide table based on whether there are stale MRs
     if (allStaleMRs.length === 0) {
