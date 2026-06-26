@@ -1,17 +1,20 @@
 #!/bin/bash
 # Start the GitLab Dashboard server
-# This script will kill any existing server on port 8000 before starting
+# Port is configurable via PORT env var, defaults to 8000 (set in .env)
 
-# Kill any existing process on port 8000
-echo "Checking for existing processes on port 8000..."
-if lsof -ti :8000 > /dev/null 2>&1; then
-    echo "Killing existing processes on port 8000..."
-    lsof -ti :8000 | xargs kill -9
+# Get port from environment or default to 8000
+PORT=${PORT:-8000}
+
+# Kill any existing process on the port
+echo "Checking for existing processes on port $PORT..."
+if lsof -ti :$PORT > /dev/null 2>&1; then
+    echo "Killing existing processes on port $PORT..."
+    lsof -ti :$PORT | xargs kill -9
     sleep 2
 fi
 
 # Start the server
-echo "Starting GitLab Dashboard server on http://localhost:8000"
+echo "Starting GitLab Dashboard server on http://localhost:$PORT"
 cd "$(dirname "$0")"
 source venv/bin/activate
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --host 0.0.0.0 --port $PORT

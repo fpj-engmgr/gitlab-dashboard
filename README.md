@@ -163,6 +163,8 @@ A web dashboard for monitoring GitLab metrics for your engineering team. Uses a 
    ```
    http://localhost:8000
    ```
+   
+   **Note:** The port is configurable via the `PORT` environment variable in `.env` (default: 8000).
 
 The dashboard will automatically fetch and cache data from GitLab on first load.
 
@@ -234,6 +236,7 @@ Edit `.env` to customize:
 - `FETCH_COMMENT_DETAILS`: Set to `True` to fetch MR comments (required for review metrics, slower)
 - `ENABLE_REVIEW_METRICS`: Set to `True` to enable review response time metrics (default: `True`)
 - `STALE_MR_DAYS`: MRs open longer than this many days are highlighted as stale (default: 7)
+- `PORT`: Port to run the server on (default: 8000)
 
 ### ⚠️ Review Response Time Metrics - Performance Impact
 
