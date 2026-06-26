@@ -383,17 +383,27 @@ function updateMRTable(mergeRequests) {
 let allStaleMRs = [];
 let currentStaleMRSort = { column: 'days_open', direction: 'desc' };
 
-function updateStaleMRsTable(mergeRequests, staleThreshold = 7) {
+function updateStaleMRsTable(mergeRequests, staleThreshold = 14) {
     const tbody = document.getElementById('staleMRsTableBody');
     const tableCard = document.getElementById('staleMRsTableCard');
     tbody.innerHTML = '';
 
+    console.log(`Filtering ${mergeRequests.length} MRs with threshold ${staleThreshold} days`);
+
     // Filter for stale MRs (open and older than threshold)
+    // Backend uses created_at < (now - threshold) which means age > threshold
     allStaleMRs = mergeRequests
         .filter(mr => {
+            if (mr.state !== 'opened') return false;
+
             const createdDate = new Date(mr.created_at);
-            const ageInDays = (new Date() - createdDate) / (1000 * 60 * 60 * 24);
-            return mr.state === 'opened' && ageInDays > staleThreshold;
+            const now = new Date();
+            const ageInMs = now - createdDate;
+            const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
+
+            // Backend comparison: created_at < (now - threshold_days)
+            // Which is equivalent to: age_in_days > threshold_days
+            return ageInDays > staleThreshold;
         })
         .map(mr => {
             const createdDate = new Date(mr.created_at);
