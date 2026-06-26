@@ -162,7 +162,7 @@ async def export_contributors_csv(
             extrasaction='ignore'
         )
         writer.writeheader()
-        writer.writerows(data['contributors'])
+        writer.writerows(data['all_contributors'])
 
         # Generate filename
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -234,8 +234,24 @@ async def export_stale_mrs_csv(
         service = MetricsService(db, group_id=group_id)
         data = service.get_merge_request_metrics(days=days, start_date=start_date, end_date=end_date, group_id=group_id)
 
-        # Filter to only stale MRs
-        stale_mrs = [mr for mr in data.get('merge_requests', []) if mr.get('is_stale', False)]
+        # Filter to only stale MRs (open and older than threshold)
+        from datetime import datetime, timedelta
+        stale_threshold = datetime.utcnow() - timedelta(days=settings.stale_mr_days)
+
+        stale_mrs = []
+        for mr in data.get('merge_requests', []):
+            if mr.get('state') == 'opened':
+                created_at = datetime.fromisoformat(mr.get('created_at'))
+                if created_at < stale_threshold:
+                    days_open = (datetime.utcnow() - created_at).days
+                    stale_mrs.append({
+                        'title': mr.get('title'),
+                        'author': mr.get('author'),
+                        'project_name': mr.get('project_name'),
+                        'days_open': days_open,
+                        'created_at': mr.get('created_at'),
+                        'web_url': mr.get('web_url')
+                    })
 
         # Create CSV
         output = StringIO()
