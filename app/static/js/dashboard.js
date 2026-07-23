@@ -168,10 +168,8 @@ function updateMetricCards(mrData, commitData, contributorData, commentData, com
     // Update comparison indicators
     updateComparison('total-mrs-comparison', comparisonData.total_mrs);
     updateComparison('merged-mrs-comparison', comparisonData.merged_mrs);
-    updateComparison('open-mrs-comparison', comparisonData.open_mrs);
     updateComparison('avg-merge-time-comparison', comparisonData.avg_time_to_merge, true); // true = inverse (lower is better)
     updateComparison('median-merge-time-comparison', comparisonData.median_time_to_merge, true);
-    updateComparison('stale-mrs-comparison', comparisonData.stale_mrs, true); // inverse (lower is better)
     updateComparison('total-contributors-comparison', comparisonData.total_contributors);
     updateComparison('total-comments-comparison', comparisonData.total_comments);
 }

@@ -537,10 +537,8 @@ class MetricsService:
         return {
             "total_mrs": calc_change(current["total"], prev["total"]),
             "merged_mrs": calc_change(current["merged"], prev["merged"]),
-            "open_mrs": calc_change(current["open"], prev["open"]),
             "avg_time_to_merge": calc_change(current["avg_time_to_merge_hours"], prev["avg_time_to_merge_hours"]),
             "median_time_to_merge": calc_change(current["median_time_to_merge_hours"], prev["median_time_to_merge_hours"]),
-            "stale_mrs": calc_change(current["stale"], prev["stale"]),
             "total_contributors": calc_change(current_contributors["total_contributors"], prev_contributors["total_contributors"]),
             "total_comments": calc_change(current_comments["total"], prev_comments["total"]),
         }
