@@ -457,10 +457,13 @@ class GitLabClient:
         since = datetime.utcnow() - timedelta(days=days)
 
         try:
-            group = self.get_group()
+            if self.source_type == "project":
+                source = self.get_project()
+            else:
+                source = self.get_group()
 
-            # Get all MRs in the group (not just the member's MRs, since they may comment on others' MRs)
-            group_mrs = group.mergerequests.list(
+            # Get all MRs (not just the member's MRs, since they may comment on others' MRs)
+            group_mrs = source.mergerequests.list(
                 updated_after=since.isoformat(),
                 get_all=True
             )
@@ -527,11 +530,13 @@ class GitLabClient:
         team_members_set = set(self.team_members)
 
         try:
-            group = self.get_group()
+            if self.source_type == "project":
+                source = self.get_project()
+            else:
+                source = self.get_group()
 
-            # Single API call to get all MRs
             logger.info(f"Fetching all MRs to scan for team member comments (fetch_comment_details=True)")
-            group_mrs = group.mergerequests.list(
+            group_mrs = source.mergerequests.list(
                 updated_after=since.isoformat(),
                 get_all=True
             )
