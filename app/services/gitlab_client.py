@@ -44,34 +44,18 @@ class GitLabClient:
         if not mr_iids:
             return {}
 
-        # Build GraphQL query for batch fetching (max 100 at a time for safety)
-        batch_size = 100
+        # Build GraphQL query for batch fetching (max 50 — 100 hits GitLab's "Query too large" limit)
+        batch_size = 50
         all_results = {}
 
         for i in range(0, len(mr_iids), batch_size):
             batch = mr_iids[i:i + batch_size]
 
-            # Create aliases for each MR in the batch
             queries = []
             for iid in batch:
-                queries.append(f"""
-                    mr{iid}: mergeRequest(iid: "{iid}") {{
-                      iid
-                      diffStatsSummary {{
-                        additions
-                        deletions
-                        changes
-                      }}
-                    }}
-                """)
+                queries.append(f'mr{iid}: mergeRequest(iid: "{iid}") {{ iid diffStatsSummary {{ additions deletions changes }} }}')
 
-            query = f"""
-            query {{
-              project(fullPath: "{project_path}") {{
-                {chr(10).join(queries)}
-              }}
-            }}
-            """
+            query = f'query {{ project(fullPath: "{project_path}") {{ {" ".join(queries)} }} }}'
 
             try:
                 # Use requests to call GraphQL API
@@ -101,7 +85,7 @@ class GitLabClient:
                                     'changes': stats.get('changes', 0)  # Total files changed
                                 }
                 else:
-                    logger.warning(f"GraphQL request failed: {response.status_code}")
+                    logger.warning(f"GraphQL request failed for {project_path} (batch {i//batch_size+1}, {len(batch)} MRs): {response.status_code} - {response.text[:200]}")
 
             except Exception as e:
                 logger.error(f"Error fetching diff stats via GraphQL: {e}")
@@ -220,19 +204,47 @@ class GitLabClient:
 
             logger.info(f"Fetched {len(source_mrs)} total MRs, filtering to team members")
 
-            # Filter to team members
+            # Filter to team members first
+            team_mrs = []
             for mr in source_mrs:
+                author = mr.author.get('username', 'unknown')
+                if author in team_members_set:
+                    team_mrs.append(mr)
+
+            logger.info(f"Filtered to {len(team_mrs)} team member MRs, fetching diff stats via GraphQL")
+
+            # Group by project for batch GraphQL diff stats
+            mrs_by_project = {}
+            for mr in team_mrs:
+                project_path = getattr(mr, 'references', {}).get('full', 'unknown').split('!')[0]
+                if project_path not in mrs_by_project:
+                    mrs_by_project[project_path] = []
+                mrs_by_project[project_path].append(mr)
+
+            diff_stats_cache = {}
+            for project_path, project_mrs in mrs_by_project.items():
+                iids = [mr.iid for mr in project_mrs]
+                try:
+                    stats = self.get_diff_stats_graphql(project_path, iids)
+                    for iid, stat in stats.items():
+                        diff_stats_cache[f"{project_path}#{iid}"] = stat
+                except Exception as e:
+                    logger.warning(f"Failed to fetch diff stats for {project_path}: {e}")
+
+            for mr in team_mrs:
                 try:
                     author = mr.author.get('username', 'unknown')
-
-                    # Skip if not a team member
-                    if author not in team_members_set:
-                        continue
+                    project_path = getattr(mr, 'references', {}).get('full', 'unknown').split('!')[0]
+                    cache_key = f"{project_path}#{mr.iid}"
+                    diff_stats = diff_stats_cache.get(cache_key, {})
+                    lines_added = diff_stats.get('additions', 0)
+                    lines_deleted = diff_stats.get('deletions', 0)
+                    lines_changed = lines_added + lines_deleted if (lines_added or lines_deleted) else None
 
                     mr_data = {
-                        'group_id': self.group_id,  # Multi-group support
+                        'group_id': self.group_id,
                         'project_id': mr.project_id,
-                        'project_name': getattr(mr, 'references', {}).get('full', 'unknown').split('!')[0],
+                        'project_name': project_path,
                         'iid': mr.iid,
                         'title': mr.title,
                         'state': mr.state,
@@ -244,6 +256,9 @@ class GitLabClient:
                         'source_branch': mr.source_branch,
                         'target_branch': mr.target_branch,
                         'web_url': mr.web_url,
+                        'lines_added': lines_added,
+                        'lines_deleted': lines_deleted,
+                        'lines_changed': lines_changed,
                     }
 
                     if mr_data['merged_at'] and mr_data['created_at']:
