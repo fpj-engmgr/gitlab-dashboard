@@ -77,6 +77,21 @@ def check_env_file():
         for g in enabled:
             src_type = g.get("type", "group")
             print(f"      - {g['name']} ({src_type}: {g['path']})")
+
+        paths = [(g['id'], g['name'], g['path']) for g in enabled]
+        for i, (id1, name1, p1) in enumerate(paths):
+            for id2, name2, p2 in paths[i + 1:]:
+                if p1.startswith(p2 + '/'):
+                    parent_name, child_name = name2, name1
+                    parent_path, child_path = p2, p1
+                elif p2.startswith(p1 + '/'):
+                    parent_name, child_name = name1, name2
+                    parent_path, child_path = p1, p2
+                else:
+                    continue
+                print(f"  {WARN} Overlapping paths (duplicates will be auto-deduplicated):")
+                print(f"      Parent: {parent_name} ({parent_path})")
+                print(f"      Child:  {child_name} ({child_path})")
     except FileNotFoundError:
         print(f"  {WARN} groups.json not found — will use GITLAB_GROUP env var as fallback")
     except ValueError as e:

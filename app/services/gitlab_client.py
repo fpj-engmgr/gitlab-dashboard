@@ -487,6 +487,7 @@ class GitLabClient:
                                 continue
 
                             comment_data = {
+                                'group_id': self.group_id,
                                 'note_id': note.id,
                                 'mr_id': mr.id,
                                 'project_id': mr.project_id,
@@ -570,6 +571,7 @@ class GitLabClient:
                             continue
 
                         comment_data = {
+                            'group_id': self.group_id,
                             'note_id': note.id,
                             'mr_id': mr.iid,
                             'project_id': project_id,

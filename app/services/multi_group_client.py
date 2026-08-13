@@ -20,11 +20,61 @@ class MultiGroupGitLabClient:
             group['id']: GitLabClient(
                 group_path=group['path'],
                 group_id=group['id'],
-                source_type=group.get('type', 'group')  # Support both "group" and "project" types
+                source_type=group.get('type', 'group')
             )
             for group in self.groups if group.get('enabled', True)
         }
+        self._group_paths = self._build_group_path_map()
         logger.info(f"Initialized multi-group client with {len(self.clients)} sources (groups/projects)")
+
+        for parent_id, parent_path, child_id, child_path in self._detect_overlaps():
+            logger.warning(
+                f"Overlapping group paths: '{parent_id}' ({parent_path}) contains "
+                f"'{child_id}' ({child_path}). Duplicates will be auto-deduplicated."
+            )
+
+    def _build_group_path_map(self) -> Dict[str, str]:
+        return {
+            group['id']: group['path']
+            for group in self.groups if group.get('enabled', True)
+        }
+
+    def _detect_overlaps(self) -> List:
+        paths = list(self._group_paths.items())
+        overlaps = []
+        for i, (id1, p1) in enumerate(paths):
+            for id2, p2 in paths[i + 1:]:
+                if p1.startswith(p2 + '/'):
+                    overlaps.append((id2, p2, id1, p1))
+                elif p2.startswith(p1 + '/'):
+                    overlaps.append((id1, p1, id2, p2))
+        return overlaps
+
+    def _dedup_merge_requests(self, mrs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        seen = {}
+        for mr in mrs:
+            key = (mr['project_id'], mr['iid'])
+            if key not in seen:
+                seen[key] = mr
+            else:
+                existing_path = self._group_paths.get(seen[key].get('group_id', ''), '')
+                new_path = self._group_paths.get(mr.get('group_id', ''), '')
+                if len(new_path) > len(existing_path):
+                    seen[key] = mr
+        return list(seen.values())
+
+    def _dedup_comments(self, comments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        seen = {}
+        for comment in comments:
+            key = comment['note_id']
+            if key not in seen:
+                seen[key] = comment
+            else:
+                existing_path = self._group_paths.get(seen[key].get('group_id', ''), '')
+                new_path = self._group_paths.get(comment.get('group_id', ''), '')
+                if len(new_path) > len(existing_path):
+                    seen[key] = comment
+        return list(seen.values())
 
     def get_all_merge_requests(self, days: int = 30) -> List[Dict[str, Any]]:
         """Fetch MRs from all groups in parallel."""
@@ -48,6 +98,10 @@ class MultiGroupGitLabClient:
                 except Exception as e:
                     logger.error(f"Error fetching MRs for group {group_id}: {e}")
 
+        before_dedup = len(all_mrs)
+        all_mrs = self._dedup_merge_requests(all_mrs)
+        if before_dedup != len(all_mrs):
+            logger.info(f"Dedup removed {before_dedup - len(all_mrs)} duplicate MRs (overlapping groups)")
         logger.info(f"Total MRs fetched from all groups: {len(all_mrs)}")
         return all_mrs
 
@@ -73,6 +127,10 @@ class MultiGroupGitLabClient:
                 except Exception as e:
                     logger.error(f"Error fetching comments for group {group_id}: {e}")
 
+        before_dedup = len(all_comments)
+        all_comments = self._dedup_comments(all_comments)
+        if before_dedup != len(all_comments):
+            logger.info(f"Dedup removed {before_dedup - len(all_comments)} duplicate comments (overlapping groups)")
         logger.info(f"Total comments fetched from all groups: {len(all_comments)}")
         return all_comments
 
