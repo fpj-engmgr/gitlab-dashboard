@@ -19,7 +19,16 @@ if lsof -ti :$PORT > /dev/null 2>&1; then
 fi
 
 # Start the server
-echo "Starting GitLab Dashboard server on http://localhost:$PORT"
 cd "$(dirname "$0")"
 source venv/bin/activate
+
+# Verify setup before starting
+echo "Running setup verification..."
+python scripts/test_setup.py
+if [ $? -ne 0 ]; then
+    echo "Setup verification failed. Fix the issues above before starting."
+    exit 1
+fi
+
+echo "Starting GitLab Dashboard server on http://localhost:$PORT"
 uvicorn app.main:app --reload --host 0.0.0.0 --port $PORT

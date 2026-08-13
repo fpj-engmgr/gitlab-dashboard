@@ -18,5 +18,12 @@ fi
 echo "Installing dependencies..."
 pip install -r requirements.txt
 
+echo "Running setup verification..."
+python scripts/test_setup.py
+if [ $? -ne 0 ]; then
+    echo "Setup verification failed. Fix the issues above before starting."
+    exit 1
+fi
+
 echo "Starting GitLab Dashboard..."
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
