@@ -114,8 +114,7 @@ class MetricsService:
 
     def refresh_comments(self, days: int = 30):
         """Refresh comments cache."""
-        # Skip comment fetching if review metrics are disabled (major performance improvement)
-        if not settings.enable_review_metrics:
+        if not settings.fetch_comment_details:
             self.update_cache_metadata("comments")
             return
 
@@ -546,6 +545,9 @@ class MetricsService:
     def _get_group_breakdown(self, mrs: List[MergeRequest]) -> Dict[str, Any]:
         """Calculate per-group metrics."""
         groups = {}
+        for g in settings.get_groups():
+            if g.get('enabled', True):
+                groups[g['id']] = {"total": 0, "merged": 0, "open": 0, "closed": 0}
         for mr in mrs:
             gid = mr.group_id or "default"
             if gid not in groups:
