@@ -44,8 +44,8 @@ class GitLabClient:
         if not mr_iids:
             return {}
 
-        # Build GraphQL query for batch fetching (max 50 — 100 hits GitLab's "Query too large" limit)
-        batch_size = 50
+        # Each mergeRequest+diffStatsSummary costs ~7 complexity points; GitLab caps at 250
+        batch_size = 35
         all_results = {}
 
         for i in range(0, len(mr_iids), batch_size):
@@ -58,7 +58,6 @@ class GitLabClient:
             query = f'query {{ project(fullPath: "{project_path}") {{ {" ".join(queries)} }} }}'
 
             try:
-                # Use requests to call GraphQL API
                 headers = {
                     'Authorization': f'Bearer {settings.gitlab_token}',
                     'Content-Type': 'application/json'
@@ -71,21 +70,27 @@ class GitLabClient:
                     timeout=30
                 )
 
-                if response.status_code == 200:
-                    data = response.json()
-                    if 'data' in data and 'project' in data['data']:
-                        project_data = data['data']['project']
-                        for key, mr_data in project_data.items():
-                            if mr_data and 'diffStatsSummary' in mr_data:
-                                iid = mr_data['iid']
-                                stats = mr_data['diffStatsSummary']
-                                all_results[iid] = {
-                                    'additions': stats.get('additions', 0),
-                                    'deletions': stats.get('deletions', 0),
-                                    'changes': stats.get('changes', 0)  # Total files changed
-                                }
-                else:
-                    logger.warning(f"GraphQL request failed for {project_path} (batch {i//batch_size+1}, {len(batch)} MRs): {response.status_code} - {response.text[:200]}")
+                data = response.json()
+
+                if 'errors' in data:
+                    logger.warning(f"GraphQL errors for {project_path} (batch {i//batch_size+1}, {len(batch)} MRs): {data['errors'][0].get('message', data['errors'])}")
+                    continue
+
+                if response.status_code != 200:
+                    logger.warning(f"GraphQL request failed for {project_path} (batch {i//batch_size+1}, {len(batch)} MRs): {response.status_code}")
+                    continue
+
+                project_data = data.get('data', {}).get('project')
+                if project_data:
+                    for key, mr_data in project_data.items():
+                        if mr_data and 'diffStatsSummary' in mr_data:
+                            iid = mr_data['iid']
+                            stats = mr_data['diffStatsSummary']
+                            all_results[iid] = {
+                                'additions': stats.get('additions', 0),
+                                'deletions': stats.get('deletions', 0),
+                                'changes': stats.get('changes', 0),
+                            }
 
             except Exception as e:
                 logger.error(f"Error fetching diff stats via GraphQL: {e}")
