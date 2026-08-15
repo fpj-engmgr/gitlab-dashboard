@@ -1096,7 +1096,7 @@ async function loadTrends() {
             const daysFromStart = Math.max(1, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)) + 1);
             dateParams = `days=${Math.floor(daysFromStart)}&start_date=${currentStartDate}&end_date=${currentEndDate}`;
         } else {
-            const validDays = (currentDays && !isNaN(currentDays)) ? currentDays : 90;  // Default 90 days for trends
+            const validDays = (currentDays && !isNaN(currentDays)) ? currentDays : 30;
             dateParams = `days=${validDays}`;
         }
 
